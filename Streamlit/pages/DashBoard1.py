@@ -7,7 +7,7 @@ import ta
 st.title('Stock Price App')
 
 # Create a text input for the user to enter a stock name
-ticker = st.sidebar.text_input('Enter a stock name (e.g. Apple)')
+ticker = st.text_input('Enter a stock name (e.g. Apple)')
 
 
 # Main section for user-selected stock
