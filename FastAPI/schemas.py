@@ -27,8 +27,9 @@ class User_Activity_Table(Base):
     request_type = Column(String)
     api_endpoint = Column(String)
     response_code = Column(String)
+    detail = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-    calls_remaining = Column(Integer)
+    api_call_number = Column(Integer, autoincrement=True)
 
 class User(BaseModel):
     full_name: str
