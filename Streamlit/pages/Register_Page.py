@@ -5,8 +5,15 @@ import boto3
 import requests
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
+from dotenv import load_dotenv
 
-BASE_URL = "http://localhost:8001"
+load_dotenv()
+app_status = os.environ.get('APP_STATUS')
+
+if app_status == "DEV":
+    BASE_URL = "http://localhost:8001"
+elif app_status == "PROD":
+    BASE_URL = "http://:8001"
 
 # Authenticate S3 client for logging with your user credentials that are stored in your .env config file
 clientLogs = boto3.client('logs',
