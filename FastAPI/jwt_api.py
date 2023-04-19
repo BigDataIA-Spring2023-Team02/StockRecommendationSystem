@@ -32,7 +32,7 @@ def verify_token(token:str, credentials_exception):
     if username is None:
         raise credentials_exception
     token_data = schemas.TokenData(username=username)
-    return token_data
+    return username
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
