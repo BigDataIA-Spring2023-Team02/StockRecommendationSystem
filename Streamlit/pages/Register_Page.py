@@ -4,7 +4,6 @@ import time
 import boto3
 import requests
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +14,6 @@ if app_status == "DEV":
 elif app_status == "PROD":
     BASE_URL = "http://:8001"
 
-# Authenticate S3 client for logging with your user credentials that are stored in your .env config file
 clientLogs = boto3.client('logs',
                         region_name='us-east-1',
                         aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
@@ -33,6 +31,7 @@ def write_logs(message: str):
             }
         ]
     )
+
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False

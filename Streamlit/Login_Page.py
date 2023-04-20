@@ -6,7 +6,6 @@ import streamlit as st
 from dotenv import load_dotenv
 from requests.exceptions import HTTPError
 from fastapi.security import OAuth2PasswordBearer
-from streamlit_extras.switch_page_button import switch_page
 
 load_dotenv()
 app_status = os.environ.get('APP_STATUS')
@@ -16,25 +15,10 @@ if app_status == "DEV":
 elif app_status == "PROD":
     BASE_URL = "http://:8001"
 
-# # Authenticate S3 client for logging with your user credentials that are stored in your .env config file
-# clientLogs = boto3.client('logs',
-#                         region_name='us-east-1',
-#                         aws_access_key_id = os.environ.get('AWS_LOG_ACCESS_KEY'),
-#                         aws_secret_access_key = os.environ.get('AWS_LOG_SECRET_KEY')
-#                         )
-
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.access_token = ''
-    st.session_state.full_name = ''
-    st.session_state.email = ''
-    st.session_state.username = ''
-    st.session_state.password = ''
-
-if st.session_state.logged_in == False:
+def login_page():
     st.title("Stock Recommendation Tool !!!")
     st.header("Login Page !!!")
-    
+
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     login_button = st.button('Log In !!!')
@@ -61,15 +45,13 @@ if st.session_state.logged_in == False:
                 st.success("Login successful")
                 st.experimental_rerun()
             elif response.status_code == 401:
-                with st.spinner("Loading Page..."):
-                    switch_page('Register_Page')
+                st.session_state.page = 'Register_Page'
             else:
                 st.error("Incorrect username or password entered !!")
                 st.error("Please check again your user credentails !!")
-    
+
     if forgot_password:
-        with st.spinner("Loading Page..."):
-            switch_page('Forgot_Password')
+        st.session_state.page = 'Forgot_Password'
 
     with st.sidebar:
         if st.session_state and st.session_state.logged_in and st.session_state.username:
@@ -77,6 +59,25 @@ if st.session_state.logged_in == False:
         else:
             st.write('Current User: Not Logged In')
 
-if st.session_state.logged_in == True:
-    with st.spinner("Loading..."):
-        switch_page('')
+def main():
+    if 'page' not in st.session_state:
+        st.session_state.page = 'Login'
+    
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+        st.session_state.access_token = ''
+        st.session_state.full_name = ''
+        st.session_state.email = ''
+        st.session_state.username = ''
+        st.session_state.password = ''
+
+    pages = {
+        "Login": login_page,
+        # Add other page functions here, e.g. "Register": register_page, "Forgot_Password": forgot_password_page
+    }
+
+    pages[st.session_state.page]()
+
+
+if __name__ == "__main__":
+    main()
