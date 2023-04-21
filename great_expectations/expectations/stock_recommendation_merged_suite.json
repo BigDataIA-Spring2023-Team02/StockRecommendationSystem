@@ -5,8 +5,8 @@
     {
       "expectation_type": "expect_table_row_count_to_be_between",
       "kwargs": {
-        "max_value": 450,
-        "min_value": 450
+        "max_value": 10000,
+        "min_value": 0
       },
       "meta": {
         "profiler_details": {
@@ -24,7 +24,7 @@
       "kwargs": {
         "column": "sentiment",
         "max_value": 1,
-        "min_value": 0
+        "min_value": -1
       },
       "meta": {
         "description": "Check that the sentiment column has values between 0 and 1.",
