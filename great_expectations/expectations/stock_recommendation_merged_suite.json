@@ -1,0 +1,172 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "stock_recommendation_merged_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "max_value": 450,
+        "min_value": 450
+      },
+      "meta": {
+        "profiler_details": {
+          "metric_configuration": {
+            "domain_kwargs": {},
+            "metric_name": "table.row_count",
+            "metric_value_kwargs": null
+          },
+          "num_batches": 1
+        }
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "sentiment",
+        "max_value": 1,
+        "min_value": 0
+      },
+      "meta": {
+        "description": "Check that the sentiment column has values between 0 and 1.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "daily_return",
+        "max_value": 1,
+        "min_value": -1
+      },
+      "meta": {
+        "description": "Check that the daily_return and next_week_return columns have values between -1 and 1.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "next_week_return",
+        "max_value": 1,
+        "min_value": -1
+      },
+      "meta": {
+        "description": "Check that the daily_return and next_week_return columns have values between -1 and 1.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "high",
+        "max_value": 1000000,
+        "min_value": 0,
+        "mostly": 1,
+        "parse_strings_as_datetimes": false
+      },
+      "meta": {
+        "description": "Check that high, open, low, and close columns do not have null values or values that are either zero or negative.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "open",
+        "max_value": 1000000,
+        "min_value": 0,
+        "mostly": 1,
+        "parse_strings_as_datetimes": false
+      },
+      "meta": {
+        "description": "Check that high, open, low, and close columns do not have null values or values that are either zero or negative.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "low",
+        "max_value": 1000000,
+        "min_value": 0,
+        "mostly": 1,
+        "parse_strings_as_datetimes": false
+      },
+      "meta": {
+        "description": "Check that high, open, low, and close columns do not have null values or values that are either zero or negative.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "close",
+        "max_value": 1000000,
+        "min_value": 0,
+        "mostly": 1,
+        "parse_strings_as_datetimes": false
+      },
+      "meta": {
+        "description": "Check that high, open, low, and close columns do not have null values or values that are either zero or negative.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "dividend_amount",
+        "max_value": 1000000,
+        "min_value": 0,
+        "mostly": 1,
+        "parse_strings_as_datetimes": false
+      },
+      "meta": {
+        "description": "Check that high, open, low, and close columns do not have null values or values that are either zero or negative.",
+        "notes": null,
+        "tags": []
+      }
+    },
+    {
+      "expectation_type": "expect_table_columns_to_match_set",
+      "kwargs": {
+        "column_set": [
+          "close",
+          "volume",
+          "symbol",
+          "adjusted_close",
+          "split_coefficient",
+          "date",
+          "sentiment",
+          "dividend_amount",
+          "high",
+          "open",
+          "next_week_return",
+          "low",
+          "daily_return"
+        ]
+      },
+      "meta": {
+        "profiler_details": {
+          "success_ratio": 1.0
+        }
+      }
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "citations": [
+      {
+        "citation_date": "2023-04-21T06:19:15.106670Z",
+        "comment": "Created by effective Rule-Based Profiler of OnboardingDataAssistant with the configuration included.\n"
+      }
+    ],
+    "great_expectations_version": "0.15.47"
+  }
+}
