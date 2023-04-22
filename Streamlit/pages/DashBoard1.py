@@ -8,7 +8,6 @@ import plotly.express as px
 from bs4 import BeautifulSoup
 import requests
 
-
 def set_bg_hack_url():
     '''
     A function to unpack an image from url and set as bg.
