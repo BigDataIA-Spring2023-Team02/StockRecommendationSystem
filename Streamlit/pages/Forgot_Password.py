@@ -11,6 +11,14 @@ from requests.exceptions import HTTPError
 from fastapi.security import OAuth2PasswordBearer
 from streamlit_extras.switch_page_button import switch_page
 
+load_dotenv()
+app_status = os.environ.get('APP_STATUS')
+
+if app_status == "DEV":
+    BASE_URL = "http://localhost:8000"
+elif app_status == "PROD":
+    BASE_URL = "http://:8000"
+
 def set_bg_hack_url():
     '''
     A function to unpack an image from url and set as bg.
@@ -32,18 +40,9 @@ def set_bg_hack_url():
      )
 set_bg_hack_url()
 
-load_dotenv()
-app_status = os.environ.get('APP_STATUS')
-
-if app_status == "DEV":
-    BASE_URL = "http://localhost:8001"
-elif app_status == "PROD":
-    BASE_URL = "http://:8001"
-
 st.header("Reset Password Page !!!")
 
 user = st.text_input("Username")
-
 new_password = st.text_input("Password", type="password")
 personal_info = [user]
 if len(new_password) < 8:
@@ -75,27 +74,15 @@ if reset_button:
             
             try:
                 response = requests.patch(f"{BASE_URL}/user/update?username={user}", json=payload)
-            
             except:
                 st.error("Service is unavailable at the moment !!")
                 st.error("Please try again later")
                 st.stop()
-
+            
             if response.status_code == 200:
                 st.success("Password reset successfully")
-                st.session_state['reset_password'] = False
                 st.experimental_rerun()
-            
             elif response.status_code == 401:
                 st.error("Incorrect current password entered !!")
-            
             else:
                 st.error("Failed to reset password")
-
-with st.sidebar:
-    
-    if st.session_state and st.session_state.logged_in and st.session_state.username:
-        st.write(f'Current User: {st.session_state.username}')
-    
-    else:
-        st.write('Current User: Not Logged In')
