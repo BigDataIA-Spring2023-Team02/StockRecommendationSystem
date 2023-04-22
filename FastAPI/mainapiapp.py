@@ -19,7 +19,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi import Depends, status,HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
-import textblob
+from textblob import TextBlob
+from fastapi.encoders import jsonable_encoder
+import numpy as np
+import json
 
 
 
@@ -48,6 +51,16 @@ def write_logs(message: str):
             }
         ]
     )
+
+
+def custom_encoder(obj):
+    if isinstance(obj, np.int64):
+        return int(obj)
+    elif isinstance(obj, (list, tuple)):
+        return [custom_encoder(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: custom_encoder(value) for key, value in obj.items()}
+    return obj
 
 def extract_text_from_url(url):
     response = requests.get(url)
@@ -196,38 +209,39 @@ async def user_activity(current_user: schemas.User = Depends(get_current_user), 
 
 @app.get('/stock-data-scrape', status_code = status.HTTP_200_OK, tags = ['Stock-Data'])
 async def stock_data_pull(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "GET",
-        api_endpoint = "stock-data-scrape",
-        response_code = "200",
-        detail = "",
-    )
+    # activity = schemas.User_Activity_Table(
+    #     username = current_user,
+    #     plan = current_user.plan,
+    #     user_type = current_user.user_type,
+    #     request_type = "GET",
+    #     api_endpoint = "stock-data-scrape",
+    #     response_code = "200",
+    #     detail = "",
+    # )
     
-    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
-        raise HTTPException(status_code = 404, detail = "User not found")
+    # user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+    # if not user:
+    #     # activity.response_code = "404"
+    #     # activity.detail = "User not found."
+    #     # userdb.add(activity)
+    #     # userdb.commit()
+    #     raise HTTPException(status_code = 404, detail = "User not found")
     
-    if user.calls_remaining <= 0:
-        activity.response_code = "403"
-        activity.detail = "Calls remaining exceeded limit"
-        userdb.add(activity)
-        userdb.commit()
-        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+    # if user.calls_remaining <= 0:
+    #     # activity.response_code = "403"
+    #     # activity.detail = "Calls remaining exceeded limit"
+    #     # userdb.add(activity)
+    #     # userdb.commit()
+    #     return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
     
-    activity.detail = f""
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
+    # activity.detail = f""
+    # userdb.add(activity)
+    # userdb.commit()
+    # userdb.close()
     
     ## Enter the code for scraping stock data
 
+    # List of top 10 stock symbols (replace with actual symbols)
     # List of top 10 stock symbols (replace with actual symbols)
     top_10_stocks = [
         'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'FB', 'TSLA', 'JPM', 'V', 'JNJ', 'MA'
@@ -235,8 +249,10 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
     # DataFrame to store stock data
     stock_data = pd.DataFrame()
+
     for stock in top_10_stocks:
         url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={stock}&apikey={alpha_vantage_key_id}&outputsize=compact'
+
         response = requests.get(url)
         data = json.loads(response.text)
 
@@ -245,7 +261,7 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
             df = pd.DataFrame(time_series).T
             df.reset_index(inplace=True)
             df['symbol'] = stock
-            stock_data = pd.concat([stock_data, df], ignore_index=True)
+            stock_data = stock_data.append(df, ignore_index=True)
 
         # Alpha Vantage has a limit of 5 requests per minute
         sleep(60 / 5)
@@ -258,7 +274,10 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
     last_30_days = pd.to_datetime('today') - pd.Timedelta(days=30)
     filtered_data = stock_data[stock_data['date'] >= last_30_days]
 
-    #News API
+    print(filtered_data)
+    filtered_data.to_csv('filtered_data.csv', index=False)
+
+    ###################################################News API###############################################################################
     newsapi = NewsApiClient(api_key = news_api_key_id)
 
     stock_names = {
@@ -306,15 +325,18 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
 
     # Read stock data from CSV file
-    stock_data = filtered_data
-    
+    stock_data = pd.read_csv('filtered_data.csv')
+
     # Calculate additional features like daily returns
     stock_data['daily_return'] = stock_data.groupby('symbol')['adjusted_close'].pct_change()
 
     # Preprocess the news article data
     news_data = []
+
     with open('news_articles.txt', 'r', encoding='utf-8') as f:
         content = f.read()
+        print("Content of news_articles.txt:")
+        print(content)
         f.seek(0)  # Reset file pointer to the beginning of the file
 
         for line in f:
@@ -323,12 +345,14 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
                 symbol, timestamp, text = match.groups()
                 news_data.append({'symbol': symbol, 'text': text})
             else:
-                return{f"Failed to parse line: {line.strip()}"}
-    
+                print(f"Failed to parse line: {line.strip()}")
+
     news_data = pd.DataFrame(news_data)
+    print("News Data DataFrame:")
+    print(news_data.head())
 
     # Calculate sentiment scores for each news article using VADER
-    news_data['sentiment'] = news_data['text'].apply(lambda x: textblob(x).sentiment.polarity)
+    news_data['sentiment'] = news_data['text'].apply(lambda x: TextBlob(x).sentiment.polarity)
 
     # Aggregate the sentiment scores for each stock symbol
     news_sentiment = news_data.groupby('symbol')[['sentiment']].mean().reset_index()
@@ -348,5 +372,9 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
     # Save the merged data to a CSV file
     merged_data.to_csv('merged_data.csv', index=False)
-    return merged_data
 
+    json_data = merged_data.to_json(orient='records')
+    return json.loads(json_data)
+
+
+############################################################################################################################################
