@@ -1,51 +1,39 @@
 import os
+import re
 import time
+# import nltk
+import json
 import boto3
+# import torch
+# import textblob
+import requests
+import datetime
 import pandas as pd
+# import torch.nn as nn
+from time import sleep
 import user_data, schemas
 from pytest import Session
 from fastapi import FastAPI
-from sqlite3 import Connection
+from bs4 import BeautifulSoup
+# from sqlite3 import Connection
 from dotenv import load_dotenv
+from newsapi import NewsApiClient
 from sqlalchemy.orm import Session
+# from torch.utils.data import Dataset
 from http.client import HTTPException
+# from pytrends.request import TrendReq
 from fastapi.encoders import jsonable_encoder
 from fastapi import Depends, status,HTTPException
+# from transformers import Trainer, TrainingArguments
+# from sklearn.model_selection import train_test_split
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
-import pandas as pd
-import requests
-import json
-import requests
-import pandas as pd
-import matplotlib.pyplot as plt
-import csv
-import plotly.express as px
-from bs4 import BeautifulSoup
-from newsapi import NewsApiClient
-from nltk.probability import FreqDist
-from pytrends.request import TrendReq
-import nltk
-from wordcloud import WordCloud, STOPWORDS
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-import plotly.io as pio
-import yfinance as yf
-import pandas as pd
-import matplotlib.pyplot as plt
-from time import sleep
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from transformers import BertModel, BertTokenizer, BertConfig, PreTrainedModel
-from transformers import DistilBertModel, DistilBertTokenizer, DistilBertConfig, PreTrainedModel
-from transformers import Trainer, TrainingArguments
-from torch.utils.data import Dataset
-import torch
-import torch.nn as nn
-import nltk
-
+# from transformers import BertModel, BertTokenizer, BertConfig, PreTrainedModel
+# from transformers import DistilBertModel, DistilBertTokenizer, DistilBertConfig, PreTrainedModel
 
 load_dotenv()
+alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
+news_api_key_id = os.environ.get('NEWS_API_KEY')
 
 app = FastAPI()
 user_data.Base.metadata.create_all(bind = user_data.engine)
@@ -68,6 +56,13 @@ def write_logs(message: str):
             }
         ]
     )
+
+def extract_text_from_url(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    paragraphs = soup.find_all('p')
+    text = ' '.join([p.get_text() for p in paragraphs])
+    return text
 
 @app.post('/login', status_code = status.HTTP_200_OK, tags = ['User'])
 def login(request: OAuth2PasswordRequestForm = Depends(), userdb : Session = Depends(user_data.get_db)):
@@ -142,22 +137,22 @@ async def user_details(current_user: schemas.User = Depends(get_current_user), u
 
 @app.post('/user/upgradeplan', status_code = status.HTTP_200_OK, tags = ['User'])
 async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "POST",
-        api_endpoint = "user/upgradeplan",
-        response_code = "200",
-        detail = "",
-    )
+    # activity = schemas.User_Activity_Table(
+    #     username = current_user,
+    #     plan = current_user.plan,
+    #     user_type = current_user.user_type,
+    #     request_type = "POST",
+    #     api_endpoint = "user/upgradeplan",
+    #     response_code = "200",
+    #     detail = "",
+    # )
     
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
+        # activity.response_code = "404"
+        # activity.detail = "User not found."
+        # userdb.add(activity)
+        # userdb.commit()
         raise HTTPException(status_code = 404, detail = "User not found")
     
     user.plan = plan
@@ -165,33 +160,33 @@ async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.Us
     user.calls_remaining = calls_remaining
     write_logs(f"Remaining {calls_remaining} API calls for user {user}")
     
-    activity.plan = plan
-    activity.detail = "User plan upgraded."
+    # activity.plan = plan
+    # activity.detail = "User plan upgraded."
     userdb.commit()
     userdb.refresh(user)
-    userdb.add(activity)
-    userdb.commit()
+    # userdb.add(activity)
+    # userdb.commit()
     userdb.close()
     return True
 
 @app.post('/user/activity', status_code = status.HTTP_200_OK, tags = ['User'])
 async def user_activity(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "POST",
-        api_endpoint = "user/activity",
-        response_code = "200",
-        detail = "",
-    )
+    # activity = schemas.User_Activity_Table(
+    #     username = current_user,
+    #     plan = current_user.plan,
+    #     user_type = current_user.user_type,
+    #     request_type = "POST",
+    #     api_endpoint = "user/activity",
+    #     response_code = "200",
+    #     detail = "",
+    # )
     
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
+        # activity.response_code = "404"
+        # activity.detail = "User not found."
+        # userdb.add(activity)
+        # userdb.commit()
         raise HTTPException(status_code = 404, detail = "User not found")
     
     if user == "damg7245":
@@ -199,12 +194,12 @@ async def user_activity(current_user: schemas.User = Depends(get_current_user), 
     else:
         query = userdb.query(schemas.User_Activity_Table).filter(schemas.User_Activity_Table.username == current_user).all()
     
-    activity.detail = "User activity data."
+    # activity.detail = "User activity data."
     data = jsonable_encoder(query)
     write_logs(f"Returned data for the current user {user}")
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
+    # userdb.add(activity)
+    # userdb.commit()
+    # userdb.close()
     return data
 
 @app.get('/stock-data-scrape', status_code = status.HTTP_200_OK, tags = ['Stock-Data'])
@@ -234,18 +229,12 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
         # userdb.commit()
         # return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
     
-    # user.calls_remaining -= 1
-    # userdb.commit()
-
     # activity.detail = f""
     # userdb.add(activity)
     # userdb.commit()
     # userdb.close()
     
     ## Enter the code for scraping stock data
-
-    # Replace with your Alpha Vantage API key
-    api_key = os.environ.get('api_key')
 
     # List of top 10 stock symbols (replace with actual symbols)
     top_10_stocks = [
@@ -254,10 +243,8 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
     # DataFrame to store stock data
     stock_data = pd.DataFrame()
-
     for stock in top_10_stocks:
-        url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={stock}&apikey={api_key}&outputsize=compact'
-
+        url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={stock}&apikey={alpha_vantage_key_id}&outputsize=compact'
         response = requests.get(url)
         data = json.loads(response.text)
 
@@ -266,7 +253,7 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
             df = pd.DataFrame(time_series).T
             df.reset_index(inplace=True)
             df['symbol'] = stock
-            stock_data = stock_data.append(df, ignore_index=True)
+            stock_data = pd.concat([stock_data, df], ignore_index=True)
 
         # Alpha Vantage has a limit of 5 requests per minute
         sleep(60 / 5)
@@ -278,12 +265,9 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
     stock_data['date'] = pd.to_datetime(stock_data['date'])
     last_30_days = pd.to_datetime('today') - pd.Timedelta(days=30)
     filtered_data = stock_data[stock_data['date'] >= last_30_days]
-   
-    #News API
-    
-    news_api_key = os.environ.get('news_api_key')
 
-    newsapi = NewsApiClient(api_key=api_key)
+    #News API
+    newsapi = NewsApiClient(api_key = news_api_key_id)
 
     stock_names = {
         'AAPL': 'Apple Inc.',
@@ -301,23 +285,13 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
     language = 'en'
     sort_by = 'relevancy'
     page_size = 20
-
     to_date = datetime.date.today()
     from_date = to_date - datetime.timedelta(days=30)
-
     allowed_domains = 'finance.yahoo.com,fool.com,nasdaq.com,marketbeat.com,benzinga.com'
-
-    def extract_text_from_url(url):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        paragraphs = soup.find_all('p')
-        text = ' '.join([p.get_text() for p in paragraphs])
-        return text
     all_articles = []
 
     for stock_symbol, stock_name in stock_names.items():
         query = f'{stock_name}'
-        
         # Fetch articles using api_key
         articles = newsapi.get_everything(q=query,
                                         language=language,
@@ -338,21 +312,18 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
         for stock_symbol, article_text, timestamp in all_articles:
             f.write(f'{stock_symbol} ({timestamp}): {article_text}\n')
 
-    nltk.download('vader_lexicon')
+    # nltk.download('vader_lexicon')
 
     # Read stock data from CSV file
-    stock_data = pd.read_csv('filtered_data.csv')
-
+    stock_data = filtered_data
+    
     # Calculate additional features like daily returns
     stock_data['daily_return'] = stock_data.groupby('symbol')['adjusted_close'].pct_change()
 
     # Preprocess the news article data
     news_data = []
-
     with open('news_articles.txt', 'r', encoding='utf-8') as f:
         content = f.read()
-        print("Content of news_articles.txt:")
-        print(content)
         f.seek(0)  # Reset file pointer to the beginning of the file
 
         for line in f:
@@ -361,144 +332,143 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
                 symbol, timestamp, text = match.groups()
                 news_data.append({'symbol': symbol, 'text': text})
             else:
-                print(f"Failed to parse line: {line.strip()}")
-
+                return{f"Failed to parse line: {line.strip()}"}
+    
     news_data = pd.DataFrame(news_data)
-    print("News Data DataFrame:")
-    print(news_data.head())
+    # print("News Data DataFrame:")
+    # print(news_data.head())
+    return news_data
 
-    # Calculate sentiment scores for each news article using VADER
-    news_data['sentiment'] = news_data['text'].apply(lambda x: TextBlob(x).sentiment.polarity)
+    # # Calculate sentiment scores for each news article using VADER
+    # news_data['sentiment'] = news_data['text'].apply(lambda x: textblob(x).sentiment.polarity)
 
-    # Aggregate the sentiment scores for each stock symbol
-    news_sentiment = news_data.groupby('symbol')[['sentiment']].mean().reset_index()
+    # # Aggregate the sentiment scores for each stock symbol
+    # news_sentiment = news_data.groupby('symbol')[['sentiment']].mean().reset_index()
 
-    # Merge the stock data and news sentiment data into a single DataFrame
-    merged_data = stock_data.merge(news_sentiment, on='symbol')
+    # # Merge the stock data and news sentiment data into a single DataFrame
+    # merged_data = stock_data.merge(news_sentiment, on='symbol')
 
-    # Convert the 'date' column to a datetime object and sort by date
-    merged_data['date'] = pd.to_datetime(merged_data['date'])
-    merged_data = merged_data.sort_values(['symbol', 'date'])
+    # # Convert the 'date' column to a datetime object and sort by date
+    # merged_data['date'] = pd.to_datetime(merged_data['date'])
+    # merged_data = merged_data.sort_values(['symbol', 'date'])
 
-    # Create a target variable: next week's return
-    merged_data['next_week_return'] = merged_data.groupby('symbol')['adjusted_close'].shift(-5) / merged_data['adjusted_close'] - 1
+    # # Create a target variable: next week's return
+    # merged_data['next_week_return'] = merged_data.groupby('symbol')['adjusted_close'].shift(-5) / merged_data['adjusted_close'] - 1
 
-    # Drop the last 5 days for each stock, as we don't have future data for those days
-    merged_data = merged_data.groupby('symbol').apply(lambda x: x.iloc[:-5]).reset_index(drop=True)
+    # # Drop the last 5 days for each stock, as we don't have future data for those days
+    # merged_data = merged_data.groupby('symbol').apply(lambda x: x.iloc[:-5]).reset_index(drop=True)
 
-    # Save the merged data to a CSV file
-    merged_data.to_csv('merged_data.csv', index=False)
+    # # Save the merged data to a CSV file
+    # merged_data.to_csv('merged_data.csv', index=False)
+    # return merged_data
 
-
-
-@app.get('/stock-recommendation', status_code = status.HTTP_200_OK, tags = ['Stock-Recommendation'])
-async def stock_recommendation(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "GET",
-        api_endpoint = "stock-recommendation",
-        response_code = "200",
-        detail = "",
-    )
+# @app.get('/stock-recommendation', status_code = status.HTTP_200_OK, tags = ['Stock-Recommendation'])
+# async def stock_recommendation(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
+#     activity = schemas.User_Activity_Table(
+#         username = current_user,
+#         plan = current_user.plan,
+#         user_type = current_user.user_type,
+#         request_type = "GET",
+#         api_endpoint = "stock-recommendation",
+#         response_code = "200",
+#         detail = "",
+#     )
     
-    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
-        raise HTTPException(status_code = 404, detail = "User not found")
+#     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+#     if not user:
+#         activity.response_code = "404"
+#         activity.detail = "User not found."
+#         userdb.add(activity)
+#         userdb.commit()
+#         raise HTTPException(status_code = 404, detail = "User not found")
     
-    if user.calls_remaining <= 0:
-        activity.response_code = "403"
-        activity.detail = "Calls remaining exceeded limit"
-        userdb.add(activity)
-        userdb.commit()
-        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+#     if user.calls_remaining <= 0:
+#         activity.response_code = "403"
+#         activity.detail = "Calls remaining exceeded limit"
+#         userdb.add(activity)
+#         userdb.commit()
+#         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
 
-    user.calls_remaining -= 1
-    userdb.commit()
+#     user.calls_remaining -= 1
+#     userdb.commit()
 
-    activity.detail = f""
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
+#     activity.detail = f""
+#     userdb.add(activity)
+#     userdb.commit()
+#     userdb.close()
     
-    ## Enter the code for recommendation engine
+#     ## Enter the code for recommendation engine
     
+# @app.get('/stock-newsletter', status_code = status.HTTP_200_OK, tags = ['Stock-Newsletter'])
+# async def stock_newsletter(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
+#     activity = schemas.User_Activity_Table(
+#         username = current_user,
+#         plan = current_user.plan,
+#         user_type = current_user.user_type,
+#         request_type = "GET",
+#         api_endpoint = "stock-newsletter",
+#         response_code = "200",
+#         detail = "",
+#     )
     
-@app.get('/stock-newsletter', status_code = status.HTTP_200_OK, tags = ['Stock-Newsletter'])
-async def stock_newsletter(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "GET",
-        api_endpoint = "stock-newsletter",
-        response_code = "200",
-        detail = "",
-    )
+#     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+#     if not user:
+#         activity.response_code = "404"
+#         activity.detail = "User not found."
+#         userdb.add(activity)
+#         userdb.commit()
+#         raise HTTPException(status_code = 404, detail = "User not found")
     
-    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
-        raise HTTPException(status_code = 404, detail = "User not found")
-    
-    if user.calls_remaining <= 0:
-        activity.response_code = "403"
-        activity.detail = "Calls remaining exceeded limit"
-        userdb.add(activity)
-        userdb.commit()
-        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+#     if user.calls_remaining <= 0:
+#         activity.response_code = "403"
+#         activity.detail = "Calls remaining exceeded limit"
+#         userdb.add(activity)
+#         userdb.commit()
+#         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
 
-    user.calls_remaining -= 1
-    userdb.commit()
+#     user.calls_remaining -= 1
+#     userdb.commit()
 
-    activity.detail = f""
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
+#     activity.detail = f""
+#     userdb.add(activity)
+#     userdb.commit()
+#     userdb.close()
     
-    ## Enter the code for stock newsletter
+#     ## Enter the code for stock newsletter
 
-@app.get('/stock-dashboard', status_code = status.HTTP_200_OK, tags = ['Stock-Dashboard'])
-async def stock_dashboard(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "GET",
-        api_endpoint = "stock-dashboard",
-        response_code = "200",
-        detail = "",
-    )
+# @app.get('/stock-dashboard', status_code = status.HTTP_200_OK, tags = ['Stock-Dashboard'])
+# async def stock_dashboard(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
+#     activity = schemas.User_Activity_Table(
+#         username = current_user,
+#         plan = current_user.plan,
+#         user_type = current_user.user_type,
+#         request_type = "GET",
+#         api_endpoint = "stock-dashboard",
+#         response_code = "200",
+#         detail = "",
+#     )
     
-    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
-        raise HTTPException(status_code = 404, detail = "User not found")
+#     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+#     if not user:
+#         activity.response_code = "404"
+#         activity.detail = "User not found."
+#         userdb.add(activity)
+#         userdb.commit()
+#         raise HTTPException(status_code = 404, detail = "User not found")
     
-    if user.calls_remaining <= 0:
-        activity.response_code = "403"
-        activity.detail = "Calls remaining exceeded limit"
-        userdb.add(activity)
-        userdb.commit()
-        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+#     if user.calls_remaining <= 0:
+#         activity.response_code = "403"
+#         activity.detail = "Calls remaining exceeded limit"
+#         userdb.add(activity)
+#         userdb.commit()
+#         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
 
-    user.calls_remaining -= 1
-    userdb.commit()
+#     user.calls_remaining -= 1
+#     userdb.commit()
 
-    activity.detail = f""
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
+#     activity.detail = f""
+#     userdb.add(activity)
+#     userdb.commit()
+#     userdb.close()
     
-    ## Enter the code for stock dashboard
+#     ## Enter the code for stock dashboard
