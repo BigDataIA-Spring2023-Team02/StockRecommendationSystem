@@ -23,15 +23,128 @@ from textblob import TextBlob
 from fastapi.encoders import jsonable_encoder
 import numpy as np
 import json
+import textwrap
+from fastapi import Depends
+from typing import List, Tuple
+import openai
+from transformers import DistilBertTokenizer
+from transformers import Trainer, TrainingArguments
+from torch.utils.data import Dataset
+import torch
+import pickle
+from transformers import DistilBertModel, DistilBertTokenizer, DistilBertConfig, PreTrainedModel
+from transformers import DistilBertConfig
+from pathlib import Path
+from transformers import DistilBertConfig, DistilBertForSequenceClassification
+from fastapi.middleware.cors import CORSMiddleware
+from model import DistilBertForSequenceRegression
+from fastapi.responses import JSONResponse
+
+
+
+# from your_module import schemas, user_data
+# from sqlalchemy.orm import Session
+
+
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+import pandas as pd
+import pickle
+import torch
+from transformers import DistilBertTokenizer
+from typing import List
+import schemas
+import user_data
+
+from torch.optim import AdamW
+
+
+
+import joblib
+
+
+
 
 
 
 load_dotenv()
 alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
 news_api_key_id = os.environ.get('NEWS_API_KEY')
+openai.api_key = os.environ.get('openai.api_key')
 
 app = FastAPI(debug =True)
-user_data.Base.metadata.create_all(bind = user_data.engine)
+# Add the CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+# Load the saved model
+model = joblib.load("/Users/ajinabraham/Documents/BigData7245/BigData/fine_tuned_model.pkl")
+tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+
+
+
+#&%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%Recommendation Systems%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Load the fine-tuned model
+with open("fine_tuned_model.pkl", "rb") as f:
+    model = pickle.load(f)
+
+# Load the tokenizer
+tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+
+def data_to_text(data):
+    text_data = data.apply(lambda x: f"Symbol: {x['symbol']} Daily Return: {x['daily_return']} Sentiment: {x['sentiment']}", axis=1)
+    return text_data.tolist()
+
+def predict_next_week_returns(data):
+    # Convert data to text
+    text_data = data_to_text(data)
+
+    # Tokenize and preprocess the data
+    encodings = tokenizer(text_data, padding=True, truncation=True, return_tensors='pt')
+
+    # Predict next week returns using the saved model
+    with torch.no_grad():
+        model.eval()
+        outputs = model(**encodings)
+        predictions = outputs[0].detach().numpy()
+
+    return predictions
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+class StockArticles:
+    def __init__(self):
+        self.all_articles = []
+
+    def set_articles(self, articles: List[Tuple[str, str, datetime.datetime]]):
+        self.all_articles = articles
+
+    def get_articles(self) -> List[Tuple[str, str, datetime.datetime]]:
+        return self.all_articles
+
+
+
+
+stock_articles_dependency = StockArticles()
+
+
+
+
+
+def get_stock_articles() -> StockArticles:
+    return stock_articles_dependency
+
 
 # Authenticate S3 client for logging with your user credentials that are stored in your .env config file
 clientLogs = boto3.client('logs',
@@ -39,6 +152,71 @@ clientLogs = boto3.client('logs',
                         aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
                         aws_secret_access_key = os.environ.get('AWS_LOGS_SECRET_KEY')
                         )
+
+def create_gpt_prompt(top_stocks, all_articles_list):
+    prompt = "Generate a brief newsletter with key insights related to the top 5 stocks:\n\n"
+    stock_names = {
+        'AAPL': 'Apple Inc.',
+        'MSFT': 'Microsoft Corporation',
+        'AMZN': 'Amazon.com, Inc.',
+        'GOOGL': 'Alphabet Inc. (Google Class A)',
+        'FB': 'Facebook, Inc.',
+        'TSLA': 'Tesla, Inc.',
+        'JPM': 'JPMorgan Chase & Co.',
+        'V': 'Visa Inc.',
+        'JNJ': 'Johnson & Johnson',
+        'MA': 'Mastercard Incorporated'
+    }
+
+    for index, row in top_stocks.iterrows():
+        symbol = row['symbol']
+        predicted_return = row['predicted_return']
+        stock_name = stock_names[symbol]
+
+        # Get the latest article for the stock
+        stock_articles = [article for article in all_articles_list if article[0] == symbol]
+        if stock_articles:
+            latest_article = sorted(stock_articles, key=lambda x: x[2], reverse=True)[0]
+            article_text, article_timestamp = latest_article[1], latest_article[2]
+            prompt += f"{index + 1}. {stock_name} ({symbol})\n"
+            prompt += f"Predicted Return: {predicted_return:.2%}\n"
+            prompt += f"Latest Article ({article_timestamp:%Y-%m-%d}): {article_text}\n\n"
+        else:
+            prompt += f"{index + 1}. {stock_name} ({symbol})\n"
+            prompt += f"Predicted Return: {predicted_return:.2%}\n"
+            prompt += "No recent news available.\n\n"
+
+    return prompt
+
+
+
+
+def chunkify_prompt(prompt, max_tokens=1000):
+    chunks = textwrap.wrap(prompt, max_tokens)
+    return chunks
+
+def generate_newsletter(prompt, model_engine="text-davinci-002", max_tokens=1000):
+    prompt_chunks = chunkify_prompt(prompt, max_tokens)
+
+    generated_text = ""
+
+    for chunk in prompt_chunks:
+        response = openai.Completion.create(
+            engine=model_engine,
+            prompt=chunk,
+            max_tokens=max_tokens,
+            n=1,
+            stop=None,
+            temperature=0.5,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
+
+        generated_chunk = response.choices[0].text.strip()
+        generated_text += generated_chunk + ' '
+
+    return generated_text.strip()
 
 def write_logs(message: str):
     clientLogs.put_log_events(
@@ -51,7 +229,6 @@ def write_logs(message: str):
             }
         ]
     )
-
 
 def custom_encoder(obj):
     if isinstance(obj, np.int64):
@@ -142,22 +319,9 @@ async def user_details(current_user: schemas.User = Depends(get_current_user), u
 
 @app.post('/user/upgradeplan', status_code = status.HTTP_200_OK, tags = ['User'])
 async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "POST",
-        api_endpoint = "user/upgradeplan",
-        response_code = "200",
-        detail = "",
-    )
-    
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+    
     if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
         raise HTTPException(status_code = 404, detail = "User not found")
     
     user.plan = plan
@@ -165,83 +329,24 @@ async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.Us
     user.calls_remaining = calls_remaining
     write_logs(f"Remaining {calls_remaining} API calls for user {user}")
     
-    activity.plan = plan
-    activity.detail = "User plan upgraded."
     userdb.commit()
     userdb.refresh(user)
-    userdb.add(activity)
-    userdb.commit()
     userdb.close()
     return True
 
-@app.post('/user/activity', status_code = status.HTTP_200_OK, tags = ['User'])
-async def user_activity(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    activity = schemas.User_Activity_Table(
-        username = current_user,
-        plan = current_user.plan,
-        user_type = current_user.user_type,
-        request_type = "POST",
-        api_endpoint = "user/activity",
-        response_code = "200",
-        detail = "",
-    )
-    
-    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    if not user:
-        activity.response_code = "404"
-        activity.detail = "User not found."
-        userdb.add(activity)
-        userdb.commit()
-        raise HTTPException(status_code = 404, detail = "User not found")
-    
-    if user == "damg7245":
-        query = userdb.query(schemas.User_Activity_Table).all()
-    else:
-        query = userdb.query(schemas.User_Activity_Table).filter(schemas.User_Activity_Table.username == current_user).all()
-    
-    activity.detail = "User activity data."
-    data = jsonable_encoder(query)
-    write_logs(f"Returned data for the current user {user}")
-    userdb.add(activity)
-    userdb.commit()
-    userdb.close()
-    return data
-
 @app.get('/stock-data-scrape', status_code = status.HTTP_200_OK, tags = ['Stock-Data'])
 async def stock_data_pull(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    # activity = schemas.User_Activity_Table(
-    #     username = current_user,
-    #     plan = current_user.plan,
-    #     user_type = current_user.user_type,
-    #     request_type = "GET",
-    #     api_endpoint = "stock-data-scrape",
-    #     response_code = "200",
-    #     detail = "",
-    # )
+    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     
-    # user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-    # if not user:
-    #     # activity.response_code = "404"
-    #     # activity.detail = "User not found."
-    #     # userdb.add(activity)
-    #     # userdb.commit()
-    #     raise HTTPException(status_code = 404, detail = "User not found")
+    if not user:
+        raise HTTPException(status_code = 404, detail = "User not found")
     
-    # if user.calls_remaining <= 0:
-    #     # activity.response_code = "403"
-    #     # activity.detail = "Calls remaining exceeded limit"
-    #     # userdb.add(activity)
-    #     # userdb.commit()
-    #     return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+    if user.calls_remaining <= 0:
+        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
     
-    # activity.detail = f""
-    # userdb.add(activity)
-    # userdb.commit()
-    # userdb.close()
-    
+    user.calls_remaining -= 1
     ## Enter the code for scraping stock data
 
-    # List of top 10 stock symbols (replace with actual symbols)
     # List of top 10 stock symbols (replace with actual symbols)
     top_10_stocks = [
         'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'FB', 'TSLA', 'JPM', 'V', 'JNJ', 'MA'
@@ -252,7 +357,6 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
     for stock in top_10_stocks:
         url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={stock}&apikey={alpha_vantage_key_id}&outputsize=compact'
-
         response = requests.get(url)
         data = json.loads(response.text)
 
@@ -266,6 +370,7 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
         # Alpha Vantage has a limit of 5 requests per minute
         sleep(60 / 5)
 
+    user.calls_remaining -= 1
     # Rename columns
     stock_data.columns = ['date', 'open', 'high', 'low', 'close', 'adjusted_close', 'volume', 'dividend_amount', 'split_coefficient', 'symbol']
 
@@ -273,11 +378,9 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
     stock_data['date'] = pd.to_datetime(stock_data['date'])
     last_30_days = pd.to_datetime('today') - pd.Timedelta(days=30)
     filtered_data = stock_data[stock_data['date'] >= last_30_days]
-
-    print(filtered_data)
     filtered_data.to_csv('filtered_data.csv', index=False)
 
-    ###################################################News API###############################################################################
+    ################################################### News API ###############################################################################
     newsapi = NewsApiClient(api_key = news_api_key_id)
 
     stock_names = {
@@ -316,7 +419,8 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
             article_text = extract_text_from_url(article['url'])
             timestamp = datetime.datetime.strptime(article['publishedAt'], '%Y-%m-%dT%H:%M:%SZ')
             all_articles.append((stock_symbol, article_text, timestamp))
-
+    
+    user.calls_remaining -= 1
     all_articles.sort(key=lambda x: x[2])
 
     with open('news_articles.txt', 'w', encoding='utf-8') as f:
@@ -335,8 +439,6 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
     with open('news_articles.txt', 'r', encoding='utf-8') as f:
         content = f.read()
-        print("Content of news_articles.txt:")
-        print(content)
         f.seek(0)  # Reset file pointer to the beginning of the file
 
         for line in f:
@@ -348,8 +450,6 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
                 print(f"Failed to parse line: {line.strip()}")
 
     news_data = pd.DataFrame(news_data)
-    print("News Data DataFrame:")
-    print(news_data.head())
 
     # Calculate sentiment scores for each news article using VADER
     news_data['sentiment'] = news_data['text'].apply(lambda x: TextBlob(x).sentiment.polarity)
@@ -371,10 +471,82 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
     merged_data = merged_data.groupby('symbol').apply(lambda x: x.iloc[:-5]).reset_index(drop=True)
 
     # Save the merged data to a CSV file
-    merged_data.to_csv('merged_data.csv', index=False)
-
+    #merged_data.to_csv('merged_data.csv', index=False)
     json_data = merged_data.to_json(orient='records')
+
+    userdb.commit()
+    userdb.refresh(user)
+    userdb.close()
     return json.loads(json_data)
+
+############################################################################################################################################
+
+
+@app.get('/stock-newsletter', status_code = status.HTTP_200_OK, tags = ['Stock-Newsletter'])
+async def stock_newsletter(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db),stock_articles: StockArticles = Depends(get_stock_articles)):
+    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+    
+    if not user:
+        raise HTTPException(status_code = 404, detail = "User not found")
+    
+    if user.calls_remaining <= 0:
+        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+    
+    user.calls_remaining -= 1
+    ## Enter the code for scraping stock data
+    
+#     ## Enter the code for stock newsletter
+    # Create the GPT prompt using the top 5 stocks and news articles
+    data = {'symbol': ['TSLA', 'AMZN', 'TSLA', 'JPM', 'JNJ'],
+        'predicted_return': [0.079031, 0.069934, 0.056484, 0.056184, 0.055282],
+        'index': [20, 9, 59, 69, 7]}
+    
+    top_5_stocks = pd.DataFrame(data)
+    top_5_stocks.set_index('index', inplace=True)
+    stock_articles_list = stock_articles.get_articles()
+    gpt_prompt = create_gpt_prompt(top_5_stocks, stock_articles_list)
+    print(gpt_prompt)
+
+    # Generate the newsletter
+    newsletter = generate_newsletter(gpt_prompt)
+    print("\nGenerated Newsletter:\n")
+    print(newsletter)
+
+    return newsletter
+
+
 
 
 ############################################################################################################################################
+
+
+
+
+@app.get('/stock-recommendation', status_code=status.HTTP_200_OK, tags=['Stock-Recommendation'])
+async def stock_recommendation(current_user: schemas.User = Depends(get_current_user),
+                               userdb: Session = Depends(user_data.get_db)):
+    user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.calls_remaining <= 0:
+        return "Your account has reached its call limit. Please upgrade your account to continue using the service."
+
+    user.calls_remaining -= 1
+
+    # Load and prepare the dataset (replace with the actual dataset path)
+    data = pd.read_csv('/Users/ajinabraham/Documents/BigData7245/BigData/FastAPI/merged_data.csv')
+
+    # Predict next week returns
+    predictions = predict_next_week_returns(data)
+
+    # Create a DataFrame with stock symbols and their predicted next week returns
+    symbols = data['symbol'].values
+    predicted_returns = pd.DataFrame({'symbol': symbols, 'predicted_return': predictions.flatten()})
+
+    # Sort the stocks by predicted return in descending order and select the top 5
+    top_5_stocks = predicted_returns.sort_values(by='predicted_return', ascending=False).head(5)
+
+    # Return the top 5 stock recommendations as a JSON response
+    return JSONResponse(content=top_5_stocks.to_dict(orient='records'))
