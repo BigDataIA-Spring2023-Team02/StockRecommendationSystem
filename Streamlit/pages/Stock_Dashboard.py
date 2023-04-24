@@ -195,17 +195,17 @@ if st.session_state.logged_in == True:
                     \n Market Cap: {marketCap}""")
         st.write('')
 
-        selected_option = st.radio("Select a option to view:", ['Plots', 'Trends Data'], horizontal = True)
-        if selected_option == 'Plots':
-            with st.spinner('Loading...'):
-                stock_code_plot(ticker_data)
-        
-        else:
-            with st.spinner('Loading...'):
-                stock_code_tables(Stock_code)
-
     else:
         st.write("Couldn't find a stock with that name. Please try again.")
+
+    selected_option = st.radio("Select a option to view:", ['Plots', 'Trends Data'], horizontal = True)
+    if selected_option == 'Plots':
+        with st.spinner('Loading...'):
+            stock_code_plot(ticker_data)
+
+    else:
+        with st.spinner('Loading...'):
+            stock_code_tables(Stock_code)
 
 else:
     st.header("Please login to access this feature.")
