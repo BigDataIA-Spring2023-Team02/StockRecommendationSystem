@@ -26,6 +26,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Depends, status, HTTPException
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
+from typing import List, Dict, Union
+
 
 
 load_dotenv()
@@ -414,37 +416,36 @@ async def stock_recommendation(current_user: schemas.User = Depends(get_current_
     X = recent_data.drop(['symbol', 'next_week_return'], axis=1)
     recent_data['predicted_next_week_return'] = model.predict(X)
     sorted_stocks = recent_data.sort_values('predicted_next_week_return', ascending=False)
-    top5_stocks = sorted_stocks.head(5)['symbol'].tolist()
+    top5_stocks_dict = sorted_stocks.head(5)[['symbol', 'predicted_next_week_return']].to_dict(orient='records')
     
     user.calls_remaining -= 1
     userdb.commit()
     userdb.refresh(user)
     userdb.close()
-    return top5_stocks
+    return top5_stocks_dict
 
 
-@app.get('/stock-newsletter', status_code = status.HTTP_200_OK, tags = ['Stock-Newsletter'])
-async def stock_newsletter(current_user: schemas.User = Depends(get_current_user),
-                           userdb : Session = Depends(user_data.get_db),stock_articles: StockArticles = Depends(get_stock_articles)):
+@app.get('/stock-newsletter', status_code=status.HTTP_200_OK, tags=['Stock-Newsletter'])
+async def stock_newsletter(top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation),
+                           current_user: schemas.User = Depends(get_current_user),
+                           userdb: Session = Depends(user_data.get_db),
+                           stock_articles: StockArticles = Depends(get_stock_articles)):
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
-        raise HTTPException(status_code = 404, detail = "User not found")
-    
+        raise HTTPException(status_code=404, detail="User not found")
+
     if user.calls_remaining <= 0:
         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
-    
-    recommend_data = {'symbol': ['TSLA', 'AMZN', 'TSLA', 'JPM', 'JNJ'],
-        'predicted_return': [0.079031, 0.069934, 0.056484, 0.056184, 0.055282],
-        'index': [20, 9, 59, 69, 7]}
-    
-    ## Enter the code for stock newsletter
-    
+
+    top_5_stocks = pd.DataFrame(top5_stocks_dict).rename(columns={'predicted_next_week_return': 'predicted_return'})
+
+    # Reset the index of the DataFrame
+    top_5_stocks.reset_index(drop=True, inplace=True)
+
     # Create the GPT prompt using the top 5 stocks and news articles
-    top_5_stocks = pd.DataFrame(recommend_data)
-    top_5_stocks.set_index('index', inplace=True)
     stock_articles_list = stock_articles.get_articles()
     gpt_prompt = create_gpt_prompt(top_5_stocks, stock_articles_list)
-    
+
     # Generate the newsletter
     newsletter = generate_newsletter(gpt_prompt)
     with open('newsletter.txt', 'w', encoding='utf-8') as f:
