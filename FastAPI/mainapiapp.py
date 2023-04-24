@@ -15,67 +15,35 @@ from dotenv import load_dotenv
 from newsapi import NewsApiClient
 from sqlalchemy.orm import Session
 from http.client import HTTPException
-from fastapi.encoders import jsonable_encoder
-from fastapi import Depends, status,HTTPException
+# from fastapi.encoders import jsonable_encoder
+from fastapi import Depends, status, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
 from textblob import TextBlob
-from fastapi.encoders import jsonable_encoder
 import numpy as np
-import json
 import textwrap
-from fastapi import Depends
 from typing import List, Tuple
 import openai
-from transformers import DistilBertTokenizer
-from transformers import Trainer, TrainingArguments
-from torch.utils.data import Dataset
-import torch
-import pickle
-from transformers import DistilBertModel, DistilBertTokenizer, DistilBertConfig, PreTrainedModel
-from transformers import DistilBertConfig
-from pathlib import Path
-from transformers import DistilBertConfig, DistilBertForSequenceClassification
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from model import DistilBertForSequenceRegression
-from fastapi.responses import JSONResponse
-
-
-
-# from your_module import schemas, user_data
-# from sqlalchemy.orm import Session
-
-
-
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import pandas as pd
-import pickle
-import torch
-from transformers import DistilBertTokenizer
-from typing import List
 import schemas
 import user_data
-
-from torch.optim import AdamW
-
-
-
 import joblib
-
-
-
+import pandas as pd
 
 
 
 load_dotenv()
 alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
 news_api_key_id = os.environ.get('NEWS_API_KEY')
-openai.api_key = os.environ.get('openai.api_key')
+openai.api_key = os.environ.get('OPENAI_API_KEY')
 
-app = FastAPI(debug =True)
-# Add the CORS middleware
+
+
+
+app = FastAPI(debug=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -86,39 +54,9 @@ app.add_middleware(
 
 
 
-# Load the saved model
-model = joblib.load("/Users/ajinabraham/Documents/BigData7245/BigData/fine_tuned_model.pkl")
-tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
 
-
-#&%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%Recommendation Systems%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Load the fine-tuned model
-with open("fine_tuned_model.pkl", "rb") as f:
-    model = pickle.load(f)
-
-# Load the tokenizer
-tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
-
-def data_to_text(data):
-    text_data = data.apply(lambda x: f"Symbol: {x['symbol']} Daily Return: {x['daily_return']} Sentiment: {x['sentiment']}", axis=1)
-    return text_data.tolist()
-
-def predict_next_week_returns(data):
-    # Convert data to text
-    text_data = data_to_text(data)
-
-    # Tokenize and preprocess the data
-    encodings = tokenizer(text_data, padding=True, truncation=True, return_tensors='pt')
-
-    # Predict next week returns using the saved model
-    with torch.no_grad():
-        model.eval()
-        outputs = model(**encodings)
-        predictions = outputs[0].detach().numpy()
-
-    return predictions
-
+model = joblib.load('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/model.joblib')
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -429,7 +367,7 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
 
     # Read stock data from CSV file
-    stock_data = pd.read_csv('filtered_data.csv')
+    stock_data = pd.read_csv('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/filtered_data.csv')
 
     # Calculate additional features like daily returns
     stock_data['daily_return'] = stock_data.groupby('symbol')['adjusted_close'].pct_change()
@@ -526,27 +464,39 @@ async def stock_newsletter(current_user: schemas.User = Depends(get_current_user
 async def stock_recommendation(current_user: schemas.User = Depends(get_current_user),
                                userdb: Session = Depends(user_data.get_db)):
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
-
+    
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+        raise HTTPException(status_code = 404, detail = "User not found")
+    
     if user.calls_remaining <= 0:
-        return "Your account has reached its call limit. Please upgrade your account to continue using the service."
-
+        return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+    
     user.calls_remaining -= 1
 
-    # Load and prepare the dataset (replace with the actual dataset path)
-    data = pd.read_csv('/Users/ajinabraham/Documents/BigData7245/BigData/FastAPI/merged_data.csv')
+   
+   
+    # Load the data from the CSV file
+    data = pd.read_csv('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/merged_data.csv')
 
-    # Predict next week returns
-    predictions = predict_next_week_returns(data)
+    # Convert the date column to Unix timestamps
+    data['date'] = pd.to_datetime(data['date']).astype(int) // 10**9
 
-    # Create a DataFrame with stock symbols and their predicted next week returns
-    symbols = data['symbol'].values
-    predicted_returns = pd.DataFrame({'symbol': symbols, 'predicted_return': predictions.flatten()})
+    # Get the most recent data for each stock
+    recent_data = data.loc[data.groupby('symbol')['date'].idxmax()]
 
-    # Sort the stocks by predicted return in descending order and select the top 5
-    top_5_stocks = predicted_returns.sort_values(by='predicted_return', ascending=False).head(5)
+    # Remove the 'symbol' and 'next_week_return' columns from the recent_data
+    X = recent_data.drop(['symbol', 'next_week_return'], axis=1)
 
-    # Return the top 5 stock recommendations as a JSON response
-    return JSONResponse(content=top_5_stocks.to_dict(orient='records'))
+    # Predict the next week returns for each stock
+    recent_data['predicted_next_week_return'] = model.predict(X)
+
+    # Sort the stocks by predicted next week returns in descending order
+    sorted_stocks = recent_data.sort_values('predicted_next_week_return', ascending=False)
+
+    # Select the top 5 stocks
+    top5_stocks = sorted_stocks.head(5)['symbol'].tolist()
+
+    # Return the top 5 stocks as a list
+    return {'top5_stocks': top5_stocks}
+
+
