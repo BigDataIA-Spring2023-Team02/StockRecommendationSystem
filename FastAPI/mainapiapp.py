@@ -57,10 +57,11 @@ app.add_middleware(
 )
 
 
-# download the file object from S3 bucket
+# # download the file object from S3 bucket
 with open('model.joblib', 'wb') as f:
     s3Client.download_fileobj(os.environ.get('USER_BUCKET_NAME'), 'model.joblib', f)
-model = joblib.load(open('model.joblib', 'rb'))
+
+model = joblib.load('model.joblib')
 
 # model = joblib.load('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/model.joblib')
 
@@ -403,8 +404,11 @@ async def stock_recommendation(current_user: schemas.User = Depends(get_current_
     if user.calls_remaining <= 0:
         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
     
+    
+    # merged_data = pd.read_csv('merged_data.csv')
     merged_data = s3Client.get_object(Bucket=os.environ.get('USER_BUCKET_NAME'), Key=f'MergedData/{current_user}_merged_data.csv')['Body'].read().decode('utf-8')
     # Convert the date column to Unix timestamps
+    merged_data = pd.read_csv(StringIO(merged_data))
     merged_data['date'] = pd.to_datetime(merged_data['date']).astype(int) // 10**9
     recent_data = merged_data.loc[merged_data.groupby('symbol')['date'].idxmax()]
     X = recent_data.drop(['symbol', 'next_week_return'], axis=1)
