@@ -220,9 +220,37 @@ with st.sidebar:
     response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
     if response.status_code == 200:
         user_plan = json.loads(response.text)
-        st.write("Your plan: ", user_plan[0])
+        st.write("Your plan: ", user_plan)
     else:
         st.write('')
+    
+    response = requests.get(f"{BASE_URL}/user/remaining_api_calls", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+    if response.status_code == 200:
+        api_calls = json.loads(response.text)
+        st.write("Remaining calls: ", api_calls)
+    else:
+        st.write('')
+
+    ask_upgrade_button = st.button('Want to Upgrade Plan !!!')
+    if ask_upgrade_button:
+        plans = [{'name': 'Free','details': ''},
+                {'name': 'Premium','details': '30 API requests hourly'}]
+        selected_plan = st.selectbox('Select a plan', [f"{plan['name']} - {plan['details']}" for plan in plans])
+        if selected_plan == "Free - ":
+            calls_remaining = 10
+        elif selected_plan == "Premium - 30 API requests hourly":
+            calls_remaining = 50
+        upgrade_button = st.button('Upgrade !!!')
+        if upgrade_button:
+            response = requests.get(f"{BASE_URL}/user/details?plan={selected_plan}&calls_remaining={calls_remaining}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+            if response.status_code == 200:
+                plan_upgraded = json.loads(response.text)
+                if plan_upgraded == True:
+                    st.write("Plan upgraded successfully.")
+                else:
+                    st.write("Couldn't upgrade your plan")
+            else:
+                st.write('')
 
     logout_button = st.button('Log Out')
     if logout_button:
