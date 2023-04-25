@@ -27,6 +27,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Depends, status, HTTPException
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
 from typing import List, Dict, Union
+from fastapi import BackgroundTasks
+
+
+from typing import Optional
+
+
+from typing import Optional
+
 
 
 
@@ -57,6 +65,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def trigger_airflow_task(dag_id: str, task_id: str, base_url: str, api_key: Optional[str] = None):
+    url = f"{base_url}/api/v1/dags/{dag_id}/tasks/{task_id}/trigger"
+
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    response = requests.post(url, headers=headers)
+
+    if response.status_code == 200:
+        print("Task triggered successfully")
+    else:
+        print(f"Error triggering task: {response.status_code}, {response.text}")
+
+
 
 
 # # download the file object from S3 bucket
@@ -271,17 +296,18 @@ async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.Us
 
 
 @app.get('/stock-data-scrape', status_code = status.HTTP_200_OK, tags = ['Stock-Data'])
-async def stock_data_pull(current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
+async def stock_data_pull(background_tasks: BackgroundTasks, current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
+    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_data_pull")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
     
     if user.calls_remaining <= 0:
         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
-    
     ## Enter the code for scraping stock data
 
     # List of top 10 stock symbols (replace with actual symbols)
+    print("stock-data-scrape endpoint called")
     top_10_stocks = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'FB', 'TSLA', 'JPM', 'V', 'JNJ', 'MA']
 
     stock_data = pd.DataFrame()
@@ -397,8 +423,8 @@ async def stock_data_pull(current_user: schemas.User = Depends(get_current_user)
 
 
 @app.get('/stock-recommendation', status_code=status.HTTP_200_OK, tags=['Stock-Recommendation'])
-async def stock_recommendation(current_user: schemas.User = Depends(get_current_user),
-                               userdb: Session = Depends(user_data.get_db)):
+async def stock_recommendation(background_tasks: BackgroundTasks, current_user: schemas.User = Depends(get_current_user), userdb: Session = Depends(user_data.get_db)):
+    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_recommendation")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
@@ -426,10 +452,8 @@ async def stock_recommendation(current_user: schemas.User = Depends(get_current_
 
 
 @app.get('/stock-newsletter', status_code=status.HTTP_200_OK, tags=['Stock-Newsletter'])
-async def stock_newsletter(top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation),
-                           current_user: schemas.User = Depends(get_current_user),
-                           userdb: Session = Depends(user_data.get_db),
-                           stock_articles: StockArticles = Depends(get_stock_articles)):
+async def stock_newsletter(background_tasks: BackgroundTasks, top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation), current_user: schemas.User = Depends(get_current_user), userdb: Session = Depends(user_data.get_db), stock_articles: StockArticles = Depends(get_stock_articles)):
+    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_newsletter")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

@@ -34,7 +34,7 @@ model.fit(X_train, y_train)
 # Evaluate the model on the testing set
 y_pred = model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
-
+print(mse)
 # Save the model to a file
 joblib.dump(model, 'model.joblib')
 with open('model.joblib', "rb") as f:
