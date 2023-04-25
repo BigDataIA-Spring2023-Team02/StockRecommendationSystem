@@ -44,6 +44,48 @@ set_bg_hack_url()
 
 if st.session_state.logged_in == True:
     st.title("Stock Recommendation Tool !!!")
+    
+    stock_data_button = st.button('Pull Stock Data !!!')
+    if stock_data_button:
+        with st.spinner("Wait.."):
+            try:
+                response = requests.get(f"{BASE_URL}/stock-data-scrape", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+            except:
+                st.error("Service is unavailable at the moment !!")
+                st.error("Please try again later")
+                st.stop()
+            
+            if response.status_code == 200:
+                st.success("Successfully pulled Stock Data")
+                merged_data = response.text
+        
+        recommend_stock = st.button('Recommend Stocks!!!')
+        if recommend_stock:
+            with st.spinner("Wait.."):
+                try:
+                    response = requests.get(f"{BASE_URL}/stock-recommendation", data=merged_data, headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+                except:
+                    st.error("Service is unavailable at the moment !!")
+                    st.error("Please try again later")
+                    st.stop()
+                
+                if response.status_code == 200:
+                    st.success("Successfully pulled Stock Data")
+                    recommended_stock = json.loads(response.text)
+                
+            generate_newsletter = st.button('Generate Custom Newsletter!!!')
+            if generate_newsletter:
+                with st.spinner("Wait.."):
+                    try:
+                        response = requests.get(f"{BASE_URL}/stock-newsletter", data=recommended_stock, headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+                    except:
+                        st.error("Service is unavailable at the moment !!")
+                        st.error("Please try again later")
+                        st.stop()
+                    
+                    if response.status_code == 200:
+                        st.success("Successfully pulled Stock Data")
+                        newsletter = response.text
 
 else:
     st.header("Please login to access this feature.")
@@ -54,12 +96,12 @@ with st.sidebar:
     else:
         st.write('Current User: Not Logged In')
     
-    # response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
-    # if response.status_code == 200:
-    #     user_plan = json.loads(response.text)
-    #     st.write("Your plan: ", user_plan[0])
-    # else:
-    #     st.write('')
+    response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+    if response.status_code == 200:
+        user_plan = json.loads(response.text)
+        st.write("Your plan: ", user_plan[0])
+    else:
+        st.write('')
 
     logout_button = st.button('Log Out')
     if logout_button:

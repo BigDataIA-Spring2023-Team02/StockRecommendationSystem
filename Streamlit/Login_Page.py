@@ -49,12 +49,12 @@ with st.sidebar:
     else:
         st.write('Current User: Not Logged In')
     
-    # response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
-    # if response.status_code == 200:
-    #     user_plan = json.loads(response.text)
-    #     st.write("Your plan: ", user_plan[0])
-    # else:
-    #     st.write('')
+    response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+    if response.status_code == 200:
+        user_plan = json.loads(response.text)
+        st.write("Your plan: ", user_plan[0])
+    else:
+        st.write('')
 
     logout_button = st.button('Log Out')
     if logout_button:
@@ -94,7 +94,8 @@ if st.session_state.logged_in == False:
                     # st.session_state.page = 'Stock_Dashboard'
 
                 elif response.status_code == 401:
-                    switch_page('Register_Page')
+                    st.warning('Please register yourself first.')
+                    # switch_page('Register_Page')
                     # st.session_state.page = 'Register_Page'
 
                 else:
