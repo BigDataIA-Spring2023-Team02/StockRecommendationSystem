@@ -243,6 +243,24 @@ async def login(request: OAuth2PasswordRequestForm = Depends(), userdb : Session
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+# @app.post('/user/create', status_code = status.HTTP_200_OK, response_model = schemas.ShowUser, tags = ['User'])
+# async def create_user(request: schemas.User, userdb : Session = Depends(user_data.get_db)):
+#     user = userdb.query(schemas.User_Table).filter(schemas.User_Table.username == request.username).first()
+#     if not user:
+#         new_user = schemas.User_Table(full_name = request.full_name, email = request.email, 
+#                                       username = request.username, password = bcrypt(request.password), 
+#                                       plan = request.plan, user_type = request.user_type, calls_remaining = request.calls_remaining)
+#         userdb.add(new_user)
+#         userdb.commit()
+#         userdb.refresh(new_user)
+#         userdb.close()
+#         write_logs(f"Created new user of {new_user}")
+#         return new_user
+        
+#     else:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='User already exists')
+
+
 @app.post('/user/create', status_code = status.HTTP_200_OK, response_model = schemas.ShowUser, tags = ['User'])
 async def create_user(request: schemas.User, userdb : Session = Depends(user_data.get_db)):
     user = userdb.query(schemas.User_Table).filter(schemas.User_Table.username == request.username).first()
@@ -253,6 +271,11 @@ async def create_user(request: schemas.User, userdb : Session = Depends(user_dat
         userdb.add(new_user)
         userdb.commit()
         userdb.refresh(new_user)
+        
+        # Subscribe the new user's email to the SNS topic
+        topic_arn = "arn:aws:sns:us-east-1:427585180930:bigdatasns"
+        subscribe_email_to_topic(topic_arn, request.email)
+        
         userdb.close()
         write_logs(f"Created new user of {new_user}")
         return new_user
@@ -542,9 +565,3 @@ async def stock_newsletter(
     send_email_notification(subject, message, subscriber_email)
 
     return {"detail": "Stock newsletter sent to the subscriber's email."}
-
-# # Call the function when your application starts
-# # ...
-# # Call the function when your application starts
-# db = user_data.get_db()
-# subscribe_all_users_to_sns_topic(db)
