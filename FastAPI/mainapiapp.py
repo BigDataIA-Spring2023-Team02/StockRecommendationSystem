@@ -28,11 +28,7 @@ from fastapi import FastAPI, Depends, status, HTTPException
 from jwt_api import bcrypt, verify, create_access_token, get_current_user
 from typing import List, Dict, Union
 from fastapi import BackgroundTasks
-
-
-from typing import Optional
-
-
+import user_data
 from typing import Optional
 
 
@@ -43,19 +39,21 @@ alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
 news_api_key_id = os.environ.get('NEWS_API_KEY')
 openai.api_key = os.environ.get('OPENAI_API_KEY')
 
-# Authenticate S3 client for logging with your user credentials that are stored in your .env config file
 s3Client = boto3.client('s3',
                         region_name='us-east-1',
-                        aws_access_key_id = os.environ.get('AWS_ACCESS_KEY'),
-                        aws_secret_access_key = os.environ.get('AWS_SECRET_KEY')
+                        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY'),
+                        aws_secret_access_key=os.environ.get('AWS_SECRET_KEY')
                         )
 
-# Authenticate S3 client for logging with your user credentials that are stored in your .env config file
 clientLogs = boto3.client('logs',
-                        region_name='us-east-1',
-                        aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
-                        aws_secret_access_key = os.environ.get('AWS_LOGS_SECRET_KEY')
-                        )
+                          region_name='us-east-1',
+                          aws_access_key_id=os.environ.get('AWS_LOGS_ACCESS_KEY'),
+                          aws_secret_access_key=os.environ.get('AWS_LOGS_SECRET_KEY')
+                          )
+
+sns_client = boto3.client('sns', region_name='us-east-1',
+                          aws_access_key_id=os.environ.get('AWS_ACCESS_KEY'),
+                          aws_secret_access_key=os.environ.get('AWS_SECRET_KEY'))
 
 app = FastAPI(debug=True)
 app.add_middleware(
@@ -66,6 +64,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_all_email_addresses(userdb: Session) -> List[str]:
+    users = userdb.query(schemas.User_Table).all()
+    email_addresses = [user.email for user in users]
+    return email_addresses
+
+def subscribe_email_to_topic(topic_arn: str, email: str):
+    response = sns_client.subscribe(
+        TopicArn=topic_arn,
+        Protocol="email",
+        Endpoint=email
+    )
+    return response
+
+def subscribe_all_users_to_sns_topic(userdb: Session):
+    topic_arn = "arn:aws:sns:us-east-1:427585180930:bigdatasns"
+    email_addresses = get_all_email_addresses(userdb)
+    
+    for email in email_addresses:
+        subscribe_email_to_topic(topic_arn, email)
+        print(f"Subscribed {email} to the SNS topic {topic_arn}")
+
+def send_email_notification(subject: str, message: str, email: str):
+    response = sns_client.publish(
+        TopicArn="arn:aws:sns:us-east-1:427585180930:bigdatasns",
+        Message=message,
+        Subject=subject
+    )
+    return response
 
 def trigger_airflow_task(dag_id: str, task_id: str, base_url: str, api_key: Optional[str] = None):
     url = f"{base_url}/api/v1/dags/{dag_id}/tasks/{task_id}/trigger"
@@ -451,8 +477,49 @@ async def stock_recommendation(background_tasks: BackgroundTasks, current_user: 
     return top5_stocks_dict
 
 
+# @app.get('/stock-newsletter', status_code=status.HTTP_200_OK, tags=['Stock-Newsletter'])
+# async def stock_newsletter(background_tasks: BackgroundTasks, top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation), current_user: schemas.User = Depends(get_current_user), userdb: Session = Depends(user_data.get_db), stock_articles: StockArticles = Depends(get_stock_articles)):
+#     background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_newsletter")
+#     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
+
+#     if user.calls_remaining <= 0:
+#         return ("Your account has reached its call limit. Please upgrade your account to continue using the service.")
+
+#     top_5_stocks = pd.DataFrame(top5_stocks_dict).rename(columns={'predicted_next_week_return': 'predicted_return'})
+
+#     # Reset the index of the DataFrame
+#     top_5_stocks.reset_index(drop=True, inplace=True)
+
+#     # Create the GPT prompt using the top 5 stocks and news articles
+#     stock_articles_list = stock_articles.get_articles()
+#     gpt_prompt = create_gpt_prompt(top_5_stocks, stock_articles_list)
+
+#     # Generate the newsletter
+#     newsletter = generate_newsletter(gpt_prompt)
+#     with open('newsletter.txt', 'w', encoding='utf-8') as f:
+#         f.write(newsletter)
+
+#     # Store the file to AWS S3 bucket
+#     with open('newsletter.txt', 'rb') as f:
+#         s3Client.put_object(Bucket=os.environ.get('USER_BUCKET_NAME'), Key=f'MergedData/{current_user}_newsletter.txt', Body=f)
+#     os.remove('newsletter.txt')
+
+#     user.calls_remaining -= 1
+#     userdb.commit()
+#     userdb.refresh(user)
+#     userdb.close()
+#     return newsletter
+
 @app.get('/stock-newsletter', status_code=status.HTTP_200_OK, tags=['Stock-Newsletter'])
-async def stock_newsletter(background_tasks: BackgroundTasks, top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation), current_user: schemas.User = Depends(get_current_user), userdb: Session = Depends(user_data.get_db), stock_articles: StockArticles = Depends(get_stock_articles)):
+async def stock_newsletter(
+    background_tasks: BackgroundTasks, 
+    top5_stocks_dict: List[Dict[str, Union[str, float]]] = Depends(stock_recommendation), 
+    current_user: schemas.User = Depends(get_current_user), 
+    userdb: Session = Depends(user_data.get_db), 
+    stock_articles: StockArticles = Depends(get_stock_articles)
+):
     background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_newsletter")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
@@ -463,25 +530,21 @@ async def stock_newsletter(background_tasks: BackgroundTasks, top5_stocks_dict: 
 
     top_5_stocks = pd.DataFrame(top5_stocks_dict).rename(columns={'predicted_next_week_return': 'predicted_return'})
 
-    # Reset the index of the DataFrame
-    top_5_stocks.reset_index(drop=True, inplace=True)
+    # Fetch the email address of the user from the SQLite database
+    subscriber_email = user.email
 
-    # Create the GPT prompt using the top 5 stocks and news articles
-    stock_articles_list = stock_articles.get_articles()
-    gpt_prompt = create_gpt_prompt(top_5_stocks, stock_articles_list)
+    # Prepare the subject and message for the email
+    subject = "Stock Newsletter"
+    message = "Here are the top 5 stocks for this week:\n\n"
+    message += top_5_stocks.to_string(index=False)
 
-    # Generate the newsletter
-    newsletter = generate_newsletter(gpt_prompt)
-    with open('newsletter.txt', 'w', encoding='utf-8') as f:
-        f.write(newsletter)
+    # Send the email using AWS SNS
+    send_email_notification(subject, message, subscriber_email)
 
-    # Store the file to AWS S3 bucket
-    with open('newsletter.txt', 'rb') as f:
-        s3Client.put_object(Bucket=os.environ.get('USER_BUCKET_NAME'), Key=f'MergedData/{current_user}_newsletter.txt', Body=f)
-    os.remove('newsletter.txt')
+    return {"detail": "Stock newsletter sent to the subscriber's email."}
 
-    user.calls_remaining -= 1
-    userdb.commit()
-    userdb.refresh(user)
-    userdb.close()
-    return newsletter
+# # Call the function when your application starts
+# # ...
+# # Call the function when your application starts
+# db = user_data.get_db()
+# subscribe_all_users_to_sns_topic(db)
