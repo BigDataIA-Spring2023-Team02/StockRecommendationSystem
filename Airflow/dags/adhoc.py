@@ -29,6 +29,9 @@ dag = DAG(
 def call_fastapi_endpoint(endpoint, token):
     url = f"{BASE_URL}/{endpoint}"
     headers = {"Authorization": f"Bearer {token}"}
+    
+    print(f"Calling {url} with token: {token}")  # Add this line for debugging
+
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
@@ -38,7 +41,7 @@ def call_fastapi_endpoint(endpoint, token):
 
 
 def get_auth_token(username, password):
-    url = f"{BASE_URL}/token"
+    url = f"{BASE_URL}/login"
     data = {"username": username, "password": password}
     response = requests.post(url, data=data)
 
@@ -50,9 +53,13 @@ def get_auth_token(username, password):
         return None
 
 
+
 def call_get_auth_token():
     token = get_auth_token("admin", "admin1234")
+    if token is None:
+        raise Exception("Failed to get auth token.")
     return token
+
 
 
 def call_stock_data_scrape(token):
