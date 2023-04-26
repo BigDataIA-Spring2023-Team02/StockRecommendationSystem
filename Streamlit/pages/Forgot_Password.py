@@ -69,15 +69,10 @@ st.header("Reset Password Page !!!")
 
 user = st.text_input("Username")
 new_password = st.text_input("Password", type="password")
-personal_info = [user]
 if len(new_password) < 8:
     st.warning("Password must be at least 8 characters long.")
 elif not re.match("^[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;\"'<,>.?/\|`~-]+$", new_password):
     st.warning("Password can only contain letters (both upper and lowercase), numbers, and special characters.")
-elif any(info.lower() in new_password.lower() for info in personal_info):
-    st.warning("Password cannot contain any part of your personal information.")
-elif new_password.lower() in new_password.lower():
-    st.warning("Password cannot contain your username.")
 else:
     st.success("Password is valid.")
 
@@ -86,33 +81,27 @@ if new_password != confirm_password:
     st.warning("New password and confirm password must match")
 
 reset_button = st.button('Update Password !!!')
-
 if reset_button:
     with st.spinner("Resetting Password..."):
-        
         if user == '' or new_password == '' or confirm_password == '':
             st.warning("Please enter all fields")
         
         else:
-            payload = {'new_password': new_password}
-            headers = {'Authorization': f'Bearer {st.session_state["access_token"]}'}
-            
+            payload = {'password': new_password}
             try:
                 response = requests.patch(f"{BASE_URL}/user/update?username={user}", json=payload)
                 write_logs(f"Requesting fastapi update endpoint to update the password for {user}")
 
                 if response.status_code == 200:
                     st.success("Password reset successfully")
-                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 200 \nPassword updated successfuly")
-                    st.experimental_rerun()
+                    write_api_logs("API endpoint: /user/update\n Called by: " + user + " \n Response: 200 \nPassword updated successfuly")
 
                 elif response.status_code == 401:
                     st.error("Incorrect current password entered !!")
-                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 401 \nIncorrect Password set")
+                    write_api_logs("API endpoint: /user/update\n Called by: " + user + " \n Response: 401 \nIncorrect Password set")
 
                 else:
                     st.error("Failed to reset password")
-                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 404 \nFailed to reset password")
 
             except:
                 st.error("Service is unavailable at the moment !!")

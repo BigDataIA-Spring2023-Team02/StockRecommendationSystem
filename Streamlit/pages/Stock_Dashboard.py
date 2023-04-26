@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import plotly.graph_objs as go
 from pytrends.request import TrendReq
+from streamlit_extras.switch_page_button import switch_page
 
 load_dotenv()
 app_status = os.environ.get('APP_STATUS')
@@ -118,6 +119,7 @@ def stock_code_plot(ticker_data):
     # st.plotly_chart(fig2)
 
     # Link to Yahoo Finance page
+    write_logs(f"Returning Yahoo Finance Page for {Stock_code}")
     st.subheader(f'[Yahoo Finance Page for {Stock_code}](https://finance.yahoo.com/quote/{Stock_code})')
 
 def stock_code_tables(Stock_code):
@@ -156,6 +158,7 @@ def stock_code_tables(Stock_code):
     top_queries = related_queries[company_name]['top']
 
     # Display top 5 related queries in a table
+    write_logs(f"Top 5 related queries for {company_name}:")
     st.write(f"Top 5 related queries for {company_name}:")
     st.table(top_queries.head())
 
@@ -164,11 +167,53 @@ def stock_code_tables(Stock_code):
     rising_queries = pytrends.related_queries()[company_name]['rising']
     
     # Display top 5 rising queries in a table
+    write_logs(f"Top 5 rising queries for {company_name}")
     st.write(f"Top 5 rising queries for {company_name}:")
     st.table(rising_queries.head())
 
 if st.session_state.logged_in == True:
     st.title("Stock Recommendation Tool !!!")
+
+    with st.sidebar:
+        if st.session_state and st.session_state.logged_in and st.session_state.username:
+            st.write(f'Current User: {st.session_state.username}')
+            
+            response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+            if response.status_code == 200:
+                write_api_logs("API endpoint: /user/details\n Called by: " + st.session_state.username + " \n Response: 200 \nGetting user details")
+                user_plan = json.loads(response.text)
+                st.write("Your plan: ", user_plan)
+            elif response.status_code == 401:
+                st.write("Session token expired, please login again")
+                write_api_logs("API endpoint: /user/details\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")
+                st.stop()
+            else:
+                st.write('')
+            
+            response = requests.get(f"{BASE_URL}/user/remaining_api_calls", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+            if response.status_code == 200:
+                write_api_logs("API endpoint: /user/remaining_api_calls\n Called by: " + st.session_state.username + " \n Response: 200 \nRemainig API Calls available")
+                api_calls = json.loads(response.text)
+                st.write("Remaining calls: ", api_calls)
+            elif response.status_code == 401:
+                st.write("Session token expired, please login again")
+                write_api_logs("API endpoint: /user/remaining_api_calls\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")
+                st.stop()
+            else:
+                st.write('')
+            
+            ask_upgrade_button = st.button('Want to Upgrade Plan !!!')
+            if ask_upgrade_button:
+                switch_page('Upgrade_Plan')
+            
+            logout_button = st.button('Log Out')
+            if logout_button:
+                st.session_state.logged_in = False
+                st.experimental_rerun()
+        else:
+            st.write('Current User: Not Logged In')
+            st.experimental_rerun()
+
     st.subheader("Most active stocks today")
 
     header = {
@@ -177,7 +222,8 @@ if st.session_state.logged_in == True:
 
     response = requests.get('https://finance.yahoo.com/most-active/', headers = header)
     soup = BeautifulSoup(response.content, 'lxml')
-
+    write_logs(f"Calling Yahoo Finance API")
+    
     # Create a list to hold the options for the radio button
     options = []
     for item in soup.select('.simpTblRow')[:5]:
@@ -214,6 +260,7 @@ if st.session_state.logged_in == True:
 
     else:
         Stock_code = getTicker(selected_stock)
+        write_logs(f"Stock Code selected {Stock_code}")
 
     if Stock_code:
         ticker_data = yf.Ticker(Stock_code)
@@ -221,6 +268,7 @@ if st.session_state.logged_in == True:
         stock_price = round(stock_info["currentPrice"], 2)
         percent_change = round((stock_info["currentPrice"] - stock_info["regularMarketOpen"]) / stock_info["regularMarketOpen"],5)
         marketCap = stock_info["marketCap"]
+        write_logs(f"Giving Details of {Stock_code}: Stock price: {stock_price} Percentage change: {percent_change}% Market Cap: {marketCap}")
 
         st.write(f"Stock code: {Stock_code}")
         st.write(f"""Stock price: {stock_price}
@@ -229,6 +277,7 @@ if st.session_state.logged_in == True:
         st.write('')
 
     else:
+        write_logs(f"Couldn't find a stock with the name {Stock_code}")
         st.write("Couldn't find a stock with that name. Please try again.")
 
     selected_option = st.radio("Select a option to view:", ['Plots', 'Trends Data'], horizontal = True)
@@ -242,53 +291,3 @@ if st.session_state.logged_in == True:
 
 else:
     st.header("Please login to access this feature.")
-
-with st.sidebar:
-    if st.session_state and st.session_state.logged_in and st.session_state.username:
-        st.write(f'Current User: {st.session_state.username}')
-        
-        response = requests.get(f"{BASE_URL}/user/details?username={st.session_state.username}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
-        if response.status_code == 200:
-            write_api_logs("API endpoint: /user/details\n Called by: " + st.session_state.username + " \n Response: 200 \nGetting user details")
-            user_plan = json.loads(response.text)
-            st.write("Your plan: ", user_plan)
-        else:
-            st.write('')
-        
-        response = requests.get(f"{BASE_URL}/user/remaining_api_calls", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
-        if response.status_code == 200:
-            write_api_logs("API endpoint: /user/remaining_api_calls\n Called by: " + st.session_state.username + " \n Response: 200 \nRemainig API Calls available")
-            api_calls = json.loads(response.text)
-            st.write("Remaining calls: ", api_calls)
-        else:
-            st.write('')
-        
-        ask_upgrade_button = st.button('Want to Upgrade Plan !!!')
-        if ask_upgrade_button:
-            plans = [{'name': 'Free','details': ''},
-                    {'name': 'Premium','details': '30 API requests hourly'}]
-            selected_plan = st.selectbox('Select a plan', [f"{plan['name']} - {plan['details']}" for plan in plans])
-            if selected_plan == "Free - ":
-                calls_remaining = 10
-            elif selected_plan == "Premium - 30 API requests hourly":
-                calls_remaining = 50
-            
-            upgrade_button = st.button('Upgrade !!!')
-            if upgrade_button:
-                response = requests.get(f"{BASE_URL}/user/upgradeplan?plan={selected_plan}&calls_remaining={calls_remaining}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
-                if response.status_code == 200:
-                    write_api_logs("API endpoint: /user/upgradeplan\n Called by: " + st.session_state.username + " \n Response: 200 \nPlan upgraded successfully")
-                    plan_upgraded = json.loads(response.text)
-                    if plan_upgraded == True:
-                        st.write("Plan upgraded successfully.")
-                    else:
-                        st.write("Couldn't upgrade your plan")
-                else:
-                    st.write('')
-        
-        logout_button = st.button('Log Out')
-        if logout_button:
-            st.session_state.logged_in = False
-            st.experimental_rerun()
-    else:
-        st.write('Current User: Not Logged In')

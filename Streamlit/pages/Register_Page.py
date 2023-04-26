@@ -102,15 +102,12 @@ if st.session_state.logged_in == False:
 
     password = st.text_input("Password", placeholder = 'Password', type = 'password', key = "password")
     password_regex = "^[a-zA-Z0-9]{8,}$"
-    personal_info = [username, email]
     if not password:
         st.markdown("<span style='color:red'>Please enter a password.</span>", unsafe_allow_html=True)
     elif len(password) < 8:
         st.markdown("<span style='color:red'>Password must be at least 8 characters long.</span>", unsafe_allow_html=True)
     elif not re.match(password_regex, password):
         st.markdown("<span style='color:red'>Password can only contain letters (both upper and lowercase) and numbers.</span>", unsafe_allow_html=True)
-    elif any(info.lower() in password.lower() for info in personal_info):
-        st.markdown("<span style='color:red'>Password cannot contain your username or email.</span>", unsafe_allow_html=True)
     else:
         st.markdown("<span style='color:green'>Password is valid.</span>", unsafe_allow_html=True)
 
@@ -130,16 +127,17 @@ if st.session_state.logged_in == False:
         if selected_plan == "Free - ":
             calls_remaining = 10
         elif selected_plan == "Premium - 30 API requests hourly":
-            calls_remaining = 50
+            calls_remaining = 30
     else:
         selected_plan = 'Premium'
         calls_remaining = 100
-
+    selected_plan = selected_plan.split()
+    
     register_submit = st.button('Register')
 
     if register_submit:
         with st.spinner("Wait.."):        
-            try:
+            # try:
                 st.session_state.username = username
                 st.session_state.password = password
                 register_user = {
@@ -155,23 +153,19 @@ if st.session_state.logged_in == False:
                 write_logs(f"Requesting fastapi update endpoint to create a new user {username}")
 
                 if response.status_code == 200:
-                    write_api_logs("API endpoint: /user/create\n Called by: " + st.session_state.username + " \n Response: 200 \nUser registered successfully")
+                    write_api_logs("API endpoint: /user/create\n Called by: " + username + " \n Response: 200 \nUser registered successfully")
                     st.success("Account created successfully !!")
                     st.info("Now login using your ID.")
-                    if st.button('Login Page'):
-                        switch_page('Login_Page')
                 
                 elif response.status_code == 400:
-                    write_api_logs("API endpoint: /user/create\n Called by: " + st.session_state.username + " \n Response: 400 \nUser already exists")
+                    write_api_logs("API endpoint: /user/create\n Called by: " + username + " \n Response: 400 \nUser already exists")
                     st.warning("User already exists !!")
                     st.info("Please login using your ID.")
-                    if st.button('Login Page'):
-                        switch_page('Login_Page')
                 
                 else:
                     st.error("Error: User registration failed!")
 
-            except:
-                st.error("Service is unavailable at the moment !!")
-                st.error("Please try again later")
-                st.stop()
+            # except:
+            #     st.error("Service is unavailable at the moment !!")
+            #     st.error("Please try again later")
+            #     st.stop()

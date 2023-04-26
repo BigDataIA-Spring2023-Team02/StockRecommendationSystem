@@ -113,8 +113,7 @@ if st.session_state.logged_in == False:
                     
                     else:
                         st.error("""Incorrect username or password entered !! \n Please check again your user credentails !!""")
-                        write_api_logs("API endpoint: /login\n Called by: " + st.session_state.username + " \n Response: 404 \nInvalid Credentials")
-                
+                        
                 except:
                     st.error("Service is unavailable at the moment !!")
                     st.error("Please try again later")
