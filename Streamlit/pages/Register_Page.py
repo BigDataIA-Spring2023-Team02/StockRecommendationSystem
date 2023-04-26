@@ -15,6 +15,42 @@ if app_status == "DEV":
 elif app_status == "PROD":
     BASE_URL = "http://:8000"
 
+clientLogs = boto3.client('logs',
+                        region_name='us-east-1',
+                        aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
+                        aws_secret_access_key = os.environ.get('AWS_LOGS_SECRET_KEY')
+                        )
+
+def write_logs(message: str):
+    clientLogs.put_log_events(
+        logGroupName = "Stock-Recommendation-System",
+        logStreamName = "Streamlit-Logs",
+        logEvents = [
+            {
+                'timestamp' : int(time.time() * 1e3),
+                'message' : message
+            }
+        ]
+    )
+
+def write_api_logs(message: str):
+    clientLogs.put_log_events(
+        logGroupName = "Stock-Recommendation-System",
+        logStreamName = "API-Activity-Logs",
+        logEvents = [
+            {
+                'timestamp' : int(time.time() * 1e3),
+                'message' : message
+            }
+        ]
+    )
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.access_token = ''
+    st.session_state.username = ''
+    st.session_state.password = ''
+
 def set_bg_hack_url():
     '''
     A function to unpack an image from url and set as bg.
@@ -35,30 +71,6 @@ def set_bg_hack_url():
          unsafe_allow_html=True
      )
 set_bg_hack_url()
-
-clientLogs = boto3.client('logs',
-                        region_name='us-east-1',
-                        aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
-                        aws_secret_access_key = os.environ.get('AWS_LOGS_SECRET_KEY')
-                        )
-
-def write_logs(message: str):
-    clientLogs.put_log_events(
-        logGroupName = "Stock-Recommendation-System",
-        logStreamName = "Streamlit-Logs",
-        logEvents = [
-            {
-                'timestamp' : int(time.time() * 1e3),
-                'message' : message
-            }
-        ]
-    )
-
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.access_token = ''
-    st.session_state.username = ''
-    st.session_state.password = ''
 
 if st.session_state.logged_in == False:
     st.header("Signup Page !!!")
@@ -139,15 +151,18 @@ if st.session_state.logged_in == False:
                     'user_type': user,
                     'calls_remaining': calls_remaining
                 }
-                response = requests.post(url=f'{BASE_URL}/user/create', json = register_user) 
-                
+                response = requests.post(url=f'{BASE_URL}/user/create', json = register_user)
+                write_logs(f"Requesting fastapi update endpoint to create a new user {username}")
+
                 if response.status_code == 200:
+                    write_api_logs("API endpoint: /user/create\n Called by: " + st.session_state.username + " \n Response: 200 \nUser registered successfully")
                     st.success("Account created successfully !!")
                     st.info("Now login using your ID.")
                     if st.button('Login Page'):
                         switch_page('Login_Page')
                 
                 elif response.status_code == 400:
+                    write_api_logs("API endpoint: /user/create\n Called by: " + st.session_state.username + " \n Response: 400 \nUser already exists")
                     st.warning("User already exists !!")
                     st.info("Please login using your ID.")
                     if st.button('Login Page'):

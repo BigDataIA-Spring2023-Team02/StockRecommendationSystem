@@ -1,15 +1,10 @@
 import os
 import re
-import json
+import time
 import boto3
-import sqlite3
 import requests
-import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
-from requests.exceptions import HTTPError
-from fastapi.security import OAuth2PasswordBearer
-from streamlit_extras.switch_page_button import switch_page
 
 load_dotenv()
 app_status = os.environ.get('APP_STATUS')
@@ -18,6 +13,36 @@ if app_status == "DEV":
     BASE_URL = "http://localhost:8000"
 elif app_status == "PROD":
     BASE_URL = "http://:8000"
+
+clientLogs = boto3.client('logs',
+                        region_name='us-east-1',
+                        aws_access_key_id = os.environ.get('AWS_LOGS_ACCESS_KEY'),
+                        aws_secret_access_key = os.environ.get('AWS_LOGS_SECRET_KEY')
+                        )
+
+def write_logs(message: str):
+    clientLogs.put_log_events(
+        logGroupName = "Stock-Recommendation-System",
+        logStreamName = "Streamlit-Logs",
+        logEvents = [
+            {
+                'timestamp' : int(time.time() * 1e3),
+                'message' : message
+            }
+        ]
+    )
+
+def write_api_logs(message: str):
+    clientLogs.put_log_events(
+        logGroupName = "Stock-Recommendation-System",
+        logStreamName = "API-Activity-Logs",
+        logEvents = [
+            {
+                'timestamp' : int(time.time() * 1e3),
+                'message' : message
+            }
+        ]
+    )
 
 def set_bg_hack_url():
     '''
@@ -74,15 +99,22 @@ if reset_button:
             
             try:
                 response = requests.patch(f"{BASE_URL}/user/update?username={user}", json=payload)
+                write_logs(f"Requesting fastapi update endpoint to update the password for {user}")
+
+                if response.status_code == 200:
+                    st.success("Password reset successfully")
+                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 200 \nPassword updated successfuly")
+                    st.experimental_rerun()
+
+                elif response.status_code == 401:
+                    st.error("Incorrect current password entered !!")
+                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 401 \nIncorrect Password set")
+
+                else:
+                    st.error("Failed to reset password")
+                    write_api_logs("API endpoint: /user/update\n Called by: " + st.session_state.username + " \n Response: 404 \nFailed to reset password")
+
             except:
                 st.error("Service is unavailable at the moment !!")
                 st.error("Please try again later")
                 st.stop()
-            
-            if response.status_code == 200:
-                st.success("Password reset successfully")
-                st.experimental_rerun()
-            elif response.status_code == 401:
-                st.error("Incorrect current password entered !!")
-            else:
-                st.error("Failed to reset password")
