@@ -1,3 +1,4 @@
+
 import os
 import re
 import time
@@ -32,10 +33,16 @@ import user_data
 from typing import Optional
 
 
+
+
 load_dotenv()
 alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
 news_api_key_id = os.environ.get('NEWS_API_KEY')
 openai.api_key = os.environ.get('OPENAI_API_KEY')
+
+dag_id = "fastapi_dag"
+task_id = "stock_data_scrape_task"
+base_url = "http://localhost:8888/api/v1"
 
 s3Client = boto3.client('s3',
                         region_name='us-east-1',
@@ -53,30 +60,6 @@ sns_client = boto3.client('sns', region_name='us-east-1',
                           aws_access_key_id=os.environ.get('AWS_ACCESS_KEY'),
                           aws_secret_access_key=os.environ.get('AWS_SECRET_KEY'))
 
-
-def write_logs(message: str):
-    clientLogs.put_log_events(
-        logGroupName = "Stock-Recommendation-System",
-        logStreamName = "FastAPI-Logs",
-        logEvents = [
-            {
-                'timestamp' : int(time.time() * 1e3),
-                'message' : message
-            }
-        ]
-    )
-
-
-with open('model.joblib', 'wb') as f:
-    s3Client.download_fileobj(os.environ.get('USER_BUCKET_NAME'), 'model.joblib', f)
-
-model = joblib.load('model.joblib')
-
-# try:
-#     model = joblib.load('model.joblib')
-# except Exception as e:
-#     print(e)
-
 app = FastAPI(debug=True)
 app.add_middleware(
     CORSMiddleware,
@@ -86,6 +69,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_all_email_addresses(userdb: Session) -> List[str]:
+    users = userdb.query(schemas.User_Table).all()
+    email_addresses = [user.email for user in users]
+    return email_addresses
+
+def subscribe_email_to_topic(topic_arn: str, email: str):
+    response = sns_client.subscribe(
+        TopicArn=topic_arn,
+        Protocol="email",
+        Endpoint=email
+    )
+    return response
+
+def subscribe_all_users_to_sns_topic(userdb: Session):
+    topic_arn = "arn:aws:sns:us-east-1:427585180930:bigdatasns"
+    email_addresses = get_all_email_addresses(userdb)
+    
+    for email in email_addresses:
+        subscribe_email_to_topic(topic_arn, email)
+        print(f"Subscribed {email} to the SNS topic {topic_arn}")
+
+def send_email_notification(subject: str, message: str, email: str):
+    response = sns_client.publish(
+        TopicArn="arn:aws:sns:us-east-1:427585180930:bigdatasns",
+        Message=message,
+        Subject=subject
+    )
+    return response
+
+# def trigger_airflow_task(dag_id: str, task_id: str, base_url: str, api_key: Optional[str] = None):
+#     url = f"{base_url}/api/v1/dags/{dag_id}/tasks/{task_id}/trigger"
+
+#     headers = {}
+#     if api_key:
+#         headers["Authorization"] = f"Bearer {api_key}"
+
+#     response = requests.post(url, headers=headers)
+
+#     if response.status_code == 200:
+#         print("Task triggered successfully")
+#     else:
+#         print(f"Error triggering task: {response.status_code}, {response.text}")
+
+
+
+# # download the file object from S3 bucket
+with open('model.joblib', 'wb') as f:
+    s3Client.download_fileobj(os.environ.get('USER_BUCKET_NAME'), 'model.joblib', f)
+
+model = joblib.load('model.joblib')
+
+# model = joblib.load('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/model.joblib')
 
 class StockArticles:
     def __init__(self):
@@ -102,56 +137,8 @@ def get_stock_articles() -> StockArticles:
     return stock_articles_dependency
 
 
-def get_all_email_addresses(userdb: Session) -> List[str]:
-    users = userdb.query(schemas.User_Table).all()
-    email_addresses = [user.email for user in users]
-    return email_addresses
-
-
-def subscribe_email_to_topic(topic_arn: str, email: str):
-    response = sns_client.subscribe(
-        TopicArn=topic_arn,
-        Protocol="email",
-        Endpoint=email
-    )
-    return response
-
-
-def subscribe_all_users_to_sns_topic(userdb: Session):
-    topic_arn = "arn:aws:sns:us-east-1:427585180930:bigdatasns"
-    email_addresses = get_all_email_addresses(userdb)
-    
-    for email in email_addresses:
-        subscribe_email_to_topic(topic_arn, email)
-        print(f"Subscribed {email} to the SNS topic {topic_arn}")
-
-
-def send_email_notification(subject: str, message: str, email: str):
-    response = sns_client.publish(
-        TopicArn="arn:aws:sns:us-east-1:427585180930:bigdatasns",
-        Message=message,
-        Subject=subject
-    )
-    return response
-
-
-def trigger_airflow_task(dag_id: str, task_id: str, base_url: str, api_key: Optional[str] = None):
-    url = f"{base_url}/api/v1/dags/{dag_id}/tasks/{task_id}/trigger"
-
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    response = requests.post(url, headers=headers)
-
-    if response.status_code == 200:
-        print("Task triggered successfully")
-    else:
-        print(f"Error triggering task: {response.status_code}, {response.text}")
-
-
 def create_gpt_prompt(top_stocks, all_articles_list):
-    prompt = "Generate a brief newsletter with key insights related to the top 5 stocks:\n\n"
+    prompt = "Generate a comprehensive newsletter with key insights, technical analysis, and supporting news related to the top 5 stocks:\n\n"
     stock_names = {
         'AAPL': 'Apple Inc.',
         'MSFT': 'Microsoft Corporation',
@@ -168,6 +155,7 @@ def create_gpt_prompt(top_stocks, all_articles_list):
     for index, row in top_stocks.iterrows():
         symbol = row['symbol']
         predicted_return = row['predicted_return']
+        
         stock_name = stock_names[symbol]
 
         # Get the latest article for the stock
@@ -177,13 +165,38 @@ def create_gpt_prompt(top_stocks, all_articles_list):
             article_text, article_timestamp = latest_article[1], latest_article[2]
             prompt += f"{index + 1}. {stock_name} ({symbol})\n"
             prompt += f"Predicted Return: {predicted_return:.2%}\n"
-            prompt += f"Latest Article ({article_timestamp:%Y-%m-%d}): {article_text}\n\n"
+            
+            prompt += f"Latest News ({article_timestamp:%Y-%m-%d}): {article_text}\n\n"
         else:
             prompt += f"{index + 1}. {stock_name} ({symbol})\n"
             prompt += f"Predicted Return: {predicted_return:.2%}\n"
+            
             prompt += "No recent news available.\n\n"
 
     return prompt
+
+# def create_gpt_prompt(top_stocks, all_articles_list):
+#     prompt = "Generate a brief newsletter with key insights related to the top stocks with some technical analysis and company average stock movement and also give some other KPI's: "
+
+#     for index, row in top_stocks.iterrows():
+#         symbol = row['symbol']
+#         predicted_return = row['predicted_return']
+        
+
+#         # Get the latest article for the stock
+#         stock_articles = [article for article in all_articles_list if article[0] == symbol]
+#         if stock_articles:
+#             latest_article = sorted(stock_articles, key=lambda x: x[2], reverse=True)[0]
+#             article_text, article_timestamp = latest_article[1], latest_article[2]
+#             prompt += f"{index + 1}. {symbol} ({symbol})\n"
+#             prompt += f"Predicted Return: {predicted_return:.2%}\n"
+#             prompt += f"Latest Article in 2 line only key points of ({article_timestamp:%Y-%m-%d}): {article_text}\n\n"
+#         else:
+#             prompt += f"{index + 1}. {symbol} ({symbol})\n"
+#             prompt += f"Predicted Return: {predicted_return:.2%}\n"
+#             prompt += "No recent news available.\n\n"
+
+#     return prompt
 
 
 def chunkify_prompt(prompt, max_tokens=1000):
@@ -212,6 +225,19 @@ def generate_newsletter(prompt, model_engine="text-davinci-002", max_tokens=1000
         generated_text += generated_chunk + ' '
 
     return generated_text.strip()
+
+
+def write_logs(message: str):
+    clientLogs.put_log_events(
+        logGroupName = "Stock-Recommendation-System",
+        logStreamName = "FastAPI-Logs",
+        logEvents = [
+            {
+                'timestamp' : int(time.time() * 1e3),
+                'message' : message
+            }
+        ]
+    )
 
 
 def custom_encoder(obj):
@@ -247,6 +273,8 @@ async def login(request: OAuth2PasswordRequestForm = Depends(), userdb : Session
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+
+
 @app.post('/user/create', status_code = status.HTTP_200_OK, response_model = schemas.ShowUser, tags = ['User'])
 async def create_user(request: schemas.User, userdb : Session = Depends(user_data.get_db)):
     user = userdb.query(schemas.User_Table).filter(schemas.User_Table.username == request.username).first()
@@ -258,6 +286,7 @@ async def create_user(request: schemas.User, userdb : Session = Depends(user_dat
         userdb.commit()
         userdb.refresh(new_user)
         
+        # Subscribe the new user's email to the SNS topic
         topic_arn = "arn:aws:sns:us-east-1:427585180930:bigdatasns"
         subscribe_email_to_topic(topic_arn, request.email)
         
@@ -331,7 +360,7 @@ async def upgrade_plan(plan: str, calls_remaining: int, current_user: schemas.Us
 
 @app.get('/stock-data-scrape', status_code = status.HTTP_200_OK, tags = ['Stock-Data'])
 async def stock_data_pull(background_tasks: BackgroundTasks, current_user: schemas.User = Depends(get_current_user), userdb : Session = Depends(user_data.get_db)):
-    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_data_pull")
+    # background_tasks.add_task(trigger_airflow_task, base_url, "fastapi_endpoints", "stock_data_pull")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
@@ -448,17 +477,19 @@ async def stock_data_pull(background_tasks: BackgroundTasks, current_user: schem
     # Save the merged data to a CSV file
     s3Client.put_object(Body=merged_data.to_csv(index=False), Bucket=os.environ.get('USER_BUCKET_NAME'), Key=f'MergedData/{current_user}_merged_data.csv')
     json_data = merged_data.to_json(orient='records')
-    
+    stock_articles_dependency.set_articles(all_articles)
     user.calls_remaining -= 1
     userdb.commit()
     userdb.refresh(user)
     userdb.close()
+    
+
     return json.loads(json_data)
 
 
 @app.get('/stock-recommendation', status_code=status.HTTP_200_OK, tags=['Stock-Recommendation'])
 async def stock_recommendation(background_tasks: BackgroundTasks, current_user: schemas.User = Depends(get_current_user), userdb: Session = Depends(user_data.get_db)):
-    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_recommendation")
+    # background_tasks.add_task(trigger_airflow_task, base_url, "fastapi_endpoints", "stock_recommendation")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
@@ -485,6 +516,7 @@ async def stock_recommendation(background_tasks: BackgroundTasks, current_user: 
     return top5_stocks_dict
 
 
+
 @app.get('/stock-newsletter', status_code=status.HTTP_200_OK, tags=['Stock-Newsletter'])
 async def stock_newsletter(
     background_tasks: BackgroundTasks, 
@@ -493,7 +525,7 @@ async def stock_newsletter(
     userdb: Session = Depends(user_data.get_db), 
     stock_articles: StockArticles = Depends(get_stock_articles)
 ):
-    background_tasks.add_task(trigger_airflow_task, "fastapi_endpoints", "stock_newsletter")
+    # background_tasks.add_task(trigger_airflow_task, base_url, "fastapi_endpoints", "stock_newsletter")
     user = userdb.query(schemas.User_Table).filter(current_user == schemas.User_Table.username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -507,11 +539,19 @@ async def stock_newsletter(
     subscriber_email = user.email
 
     # Prepare the subject and message for the email
-    subject = "Stock Newsletter"
-    message = "Here are the top 5 stocks for this week:\n\n"
-    message += top_5_stocks.to_string(index=False)
+    subject = "Today's Stock Newsletter"
 
-    # Send the email using AWS SNS
-    send_email_notification(subject, message, subscriber_email)
+    # Use the create_gpt_prompt function to generate the newsletter content
+    all_articles_list = stock_articles.get_articles()
 
-    return {"detail": "Stock newsletter sent to the subscriber's email."}
+    return all_articles_list
+    # return stock_articles
+    # prompt = create_gpt_prompt(top_5_stocks, all_articles_list)
+
+    # # Generate the newsletter
+    # message = generate_newsletter(prompt)
+
+    # # Send the email using AWS SNS
+    # send_email_notification(subject, message, subscriber_email)
+
+    # return {"detail": "Stock newsletter sent to the subscriber's email."}
