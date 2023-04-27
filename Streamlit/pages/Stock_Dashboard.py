@@ -128,29 +128,27 @@ def stock_code_tables(Stock_code):
     company_name = msft.info['longName']
     user_input = company_name
 
-    # Create a pytrends object and get the data
-    pytrends = TrendReq()
-    pytrends.build_payload([user_input])
-    trends_data = pytrends.interest_over_time()
-    fig = px.line(trends_data, x = trends_data.index, y = user_input, title = f'{user_input} Google Trends Data')
-    st.plotly_chart(fig)
+    try:
+        # Create a pytrends object and get the data
+        pytrends = TrendReq()
+        pytrends.build_payload([user_input])
+        trends_data = pytrends.interest_over_time()
+        fig = px.line(trends_data, x = trends_data.index, y = user_input, title = f'{user_input} Google Trends Data')
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.write("Sorry Too many google trend requests (or) There are no trends to show for this")
 
-    # Create a pytrends object and get the data for interest by region
-    pytrends.build_payload(kw_list = [company_name])
-    df_region = pytrends.interest_by_region()
-    df_region = df_region.sort_values(by = [company_name], ascending = False)
 
-    df_trending = pytrends.trending_searches(pn = 'united_states')
-
-    # Display the data side by side
-    col1, col2 = st.columns(2)
-    with col1:
+    try:
+        # Create a pytrends object and get the data for interest by region    
+        pytrends.build_payload(kw_list = [company_name])
+        df_region = pytrends.interest_by_region()
+        df_region = df_region.sort_values(by = [company_name], ascending = False)
         st.write(f'Interest by region for "{company_name}" :')
         st.write(df_region)
-
-    with col2:
-        st.write("Top searches across USA right now!")
-        st.write(df_trending)
+    except Exception as e:
+        st.write("Sorry Too many google trend requests (or) There are no interest for this stock in any region")
+        
 
     try:
         # Get related queries for the stock
@@ -172,8 +170,8 @@ def stock_code_tables(Stock_code):
         st.write(f"Top 5 rising queries for {company_name}:")
         st.table(rising_queries.head())
     except Exception as e:
-        st.write("There are no related and rising queries for this stock:")
-        st.write(str(e))
+        st.write("Sorry Too many google trend requests (or) There are no related top and rising queries for this stock")
+        
 
 
 if st.session_state.logged_in == True:
