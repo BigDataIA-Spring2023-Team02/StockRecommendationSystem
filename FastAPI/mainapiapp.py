@@ -1,4 +1,3 @@
-
 import os
 import re
 import time
@@ -40,9 +39,7 @@ alpha_vantage_key_id = os.environ.get('ALPHA_VANTAGE_API_KEY')
 news_api_key_id = os.environ.get('NEWS_API_KEY')
 openai.api_key = os.environ.get('OPENAI_API_KEY')
 
-dag_id = "fastapi_dag"
-task_id = "stock_data_scrape_task"
-base_url = "http://localhost:8888/api/v1"
+
 
 s3Client = boto3.client('s3',
                         region_name='us-east-1',
@@ -61,9 +58,17 @@ sns_client = boto3.client('sns', region_name='us-east-1',
                           aws_secret_access_key=os.environ.get('AWS_SECRET_KEY'))
 
 app = FastAPI(debug=True)
+
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://localhost:8080",
+    "https://your_production_domain_here",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,19 +103,6 @@ def send_email_notification(subject: str, message: str, email: str):
     )
     return response
 
-# def trigger_airflow_task(dag_id: str, task_id: str, base_url: str, api_key: Optional[str] = None):
-#     url = f"{base_url}/api/v1/dags/{dag_id}/tasks/{task_id}/trigger"
-
-#     headers = {}
-#     if api_key:
-#         headers["Authorization"] = f"Bearer {api_key}"
-
-#     response = requests.post(url, headers=headers)
-
-#     if response.status_code == 200:
-#         print("Task triggered successfully")
-#     else:
-#         print(f"Error triggering task: {response.status_code}, {response.text}")
 
 
 
@@ -119,8 +111,6 @@ with open('model.joblib', 'wb') as f:
     s3Client.download_fileobj(os.environ.get('USER_BUCKET_NAME'), 'model.joblib', f)
 
 model = joblib.load('model.joblib')
-
-# model = joblib.load('/Users/ajinabraham/Documents/BigData7245/StockRecommendationSystem/FastAPI/model.joblib')
 
 class StockArticles:
     def __init__(self):
@@ -174,29 +164,6 @@ def create_gpt_prompt(top_stocks, all_articles_list):
             prompt += "No recent news available.\n\n"
 
     return prompt
-
-# def create_gpt_prompt(top_stocks, all_articles_list):
-#     prompt = "Generate a brief newsletter with key insights related to the top stocks with some technical analysis and company average stock movement and also give some other KPI's: "
-
-#     for index, row in top_stocks.iterrows():
-#         symbol = row['symbol']
-#         predicted_return = row['predicted_return']
-        
-
-#         # Get the latest article for the stock
-#         stock_articles = [article for article in all_articles_list if article[0] == symbol]
-#         if stock_articles:
-#             latest_article = sorted(stock_articles, key=lambda x: x[2], reverse=True)[0]
-#             article_text, article_timestamp = latest_article[1], latest_article[2]
-#             prompt += f"{index + 1}. {symbol} ({symbol})\n"
-#             prompt += f"Predicted Return: {predicted_return:.2%}\n"
-#             prompt += f"Latest Article in 2 line only key points of ({article_timestamp:%Y-%m-%d}): {article_text}\n\n"
-#         else:
-#             prompt += f"{index + 1}. {symbol} ({symbol})\n"
-#             prompt += f"Predicted Return: {predicted_return:.2%}\n"
-#             prompt += "No recent news available.\n\n"
-
-#     return prompt
 
 
 def chunkify_prompt(prompt, max_tokens=1000):
@@ -544,14 +511,14 @@ async def stock_newsletter(
     # Use the create_gpt_prompt function to generate the newsletter content
     all_articles_list = stock_articles.get_articles()
 
-    return all_articles_list
-    # return stock_articles
-    # prompt = create_gpt_prompt(top_5_stocks, all_articles_list)
+    all_articles_list
+   
+    prompt = create_gpt_prompt(top_5_stocks, all_articles_list)
 
-    # # Generate the newsletter
-    # message = generate_newsletter(prompt)
+    # Generate the newsletter
+    message = generate_newsletter(prompt)
 
-    # # Send the email using AWS SNS
-    # send_email_notification(subject, message, subscriber_email)
+    # Send the email using AWS SNS
+    send_email_notification(subject, message, subscriber_email)
 
-    # return {"detail": "Stock newsletter sent to the subscriber's email."}
+    return {"detail": "Stock newsletter sent to the subscriber's email."}

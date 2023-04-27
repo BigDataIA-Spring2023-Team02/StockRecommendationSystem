@@ -5,6 +5,7 @@ from airflow.operators.python_operator import PythonOperator
 
 
 BASE_URL = "http://host.docker.internal:8000"
+# BASE_URL = "http://localhost:8050"
  # Replace with your FastAPI app URL
 
 default_args = {

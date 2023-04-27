@@ -118,19 +118,17 @@ if st.session_state.logged_in == True:
         calls_remaining = 10
     elif selected_plan == "Premium - 30 API requests hourly":
         calls_remaining = 50
-    
+    selected_plan = selected_plan.split()
+
     upgrade_button = st.button('Upgrade!!!')
     if upgrade_button:
-        selected_plan = selected_plan.split()
-        response = requests.get(f"{BASE_URL}/user/upgradeplan?plan={selected_plan[0]}&calls_remaining={calls_remaining}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
+        response = requests.post(f"{BASE_URL}/user/upgradeplan?plan={selected_plan[0]}&calls_remaining={calls_remaining}", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
         
         if response.status_code == 200:
             write_api_logs("API endpoint: /user/upgradeplan\n Called by: " + st.session_state.username + " \n Response: 200 \nPlan upgraded successfully")
             plan_upgraded = json.loads(response.text)
-            print(plan_upgraded)
             st.success("Plan upgraded successfully.")
-            st.experimental_rerun()
-        
+            
         elif response.status_code == 401:
             st.write("Session token expired, please login again")
             write_api_logs("API endpoint: /user/upgradeplan\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")

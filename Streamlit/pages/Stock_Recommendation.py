@@ -159,15 +159,7 @@ if st.session_state.logged_in == True:
                     write_api_logs("API endpoint: /stock-data-scrape\n Called by: " + st.session_state.username + " \n Response: 200 \nPulled Stock data successfully")
                     st.success("Successfully pulled Stock Data")
                     merged_data = json.loads(response.text)
-                    # Convert the list of dictionaries to a pandas DataFrame
-                    df2 = pd.DataFrame.from_records(merged_data)
-
-                    # Set the 'symbol' column as the index
-                    df2.set_index('symbol', inplace=True)
-
-                    # Display the DataFrame in Streamlit
-                    st.write(df2)    
-                                    
+                    
                 elif response.status_code == 401:
                     st.error("Session token expired, please login again")
                     write_api_logs("API endpoint: /stock-data-scrape\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")

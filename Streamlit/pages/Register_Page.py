@@ -136,10 +136,8 @@ if st.session_state.logged_in == False:
     register_submit = st.button('Register')
 
     if register_submit:
-        with st.spinner("Wait.."):        
-            # try:
-                st.session_state.username = username
-                st.session_state.password = password
+        with st.spinner("Wait.."):
+            try:
                 register_user = {
                     'full_name': full_name,
                     'email': email,
@@ -165,7 +163,10 @@ if st.session_state.logged_in == False:
                 else:
                     st.error("Error: User registration failed!")
 
-            # except:
-            #     st.error("Service is unavailable at the moment !!")
-            #     st.error("Please try again later")
-            #     st.stop()
+            except:
+                st.error("Service is unavailable at the moment !!")
+                st.error("Please try again later")
+                st.stop()
+
+else:
+    st.subheader('Please Log out to create a new user')
