@@ -152,24 +152,29 @@ def stock_code_tables(Stock_code):
         st.write("Top searches across USA right now!")
         st.write(df_trending)
 
-    # Get related queries for the stock
-    pytrends.build_payload(kw_list = [company_name], timeframe = 'today 5-y')
-    related_queries = pytrends.related_queries()
-    top_queries = related_queries[company_name]['top']
+    try:
+        # Get related queries for the stock
+        pytrends.build_payload(kw_list=[company_name], timeframe='today 5-y')
+        related_queries = pytrends.related_queries()
+        top_queries = related_queries[company_name]['top']
 
-    # Display top 5 related queries in a table
-    write_logs(f"Top 5 related queries for {company_name}:")
-    st.write(f"Top 5 related queries for {company_name}:")
-    st.table(top_queries.head())
+        # Display top 5 related queries in a table
+        write_logs(f"Top 5 related queries for {company_name}:")
+        st.write(f"Top 5 related queries for {company_name}:")
+        st.table(top_queries.head())
 
-    # Get rising queries for the stock
-    pytrends.build_payload(kw_list = [company_name], timeframe = 'today 5-y')
-    rising_queries = pytrends.related_queries()[company_name]['rising']
-    
-    # Display top 5 rising queries in a table
-    write_logs(f"Top 5 rising queries for {company_name}")
-    st.write(f"Top 5 rising queries for {company_name}:")
-    st.table(rising_queries.head())
+        # Get rising queries for the stock
+        pytrends.build_payload(kw_list=[company_name], timeframe='today 5-y')
+        rising_queries = pytrends.related_queries()[company_name]['rising']
+
+        # Display top 5 rising queries in a table
+        write_logs(f"Top 5 rising queries for {company_name}")
+        st.write(f"Top 5 rising queries for {company_name}:")
+        st.table(rising_queries.head())
+    except Exception as e:
+        st.write("There are no related and rising queries for this stock:")
+        st.write(str(e))
+
 
 if st.session_state.logged_in == True:
     st.title("Stock Recommendation Tool !!!")

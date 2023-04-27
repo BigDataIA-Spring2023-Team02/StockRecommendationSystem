@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import json
 import time
 import boto3
@@ -6,6 +7,10 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 from streamlit_extras.switch_page_button import switch_page
+import yfinance as yf
+import ta
+import plotly.graph_objs as go
+import plotly.express as px
 
 load_dotenv()
 app_status = os.environ.get('APP_STATUS')
@@ -50,6 +55,35 @@ if 'logged_in' not in st.session_state:
     st.session_state.access_token = ''
     st.session_state.username = ''
     st.session_state.password = ''
+
+
+def stock_code_plot(ticker_symbols):
+    time_period = '1y'
+    fig1 = go.Figure()
+    colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    
+    # Loop over the list of ticker symbols
+    for i, ticker_symbol in enumerate(ticker_symbols):
+        ticker_data = yf.Ticker(ticker_symbol)
+        ticker_df = ticker_data.history(period = time_period)
+        ticker_info = ticker_data.info
+        company_name = ticker_info['longName']
+        
+        fig1.add_trace(go.Candlestick(x = ticker_df.index,
+                                      open = ticker_df['Open'],
+                                      high = ticker_df['High'],
+                                      low = ticker_df['Low'],
+                                      close = ticker_df['Close'],
+                                      increasing_line_color = colors[i % len(colors)],
+                                      decreasing_line_color = colors[i % len(colors)],
+                                      name = f"{ticker_symbol} - {company_name}"))
+    fig1.update_layout(title = f"Stock Prices - {time_period} Time Period",
+                       xaxis_title = 'Date',
+                       yaxis_title = 'Price')
+    st.plotly_chart(fig1)
+
+
+
 
 def set_bg_hack_url():
     '''
@@ -121,11 +155,19 @@ if st.session_state.logged_in == True:
             try:
                 response = requests.get(f"{BASE_URL}/stock-data-scrape", headers={'Authorization' : f"Bearer {st.session_state['access_token']}"})
                 write_logs(f"Pulling Stock data from Yahoo Finance for 10 Stocks")
-                
                 if response.status_code == 200:
                     write_api_logs("API endpoint: /stock-data-scrape\n Called by: " + st.session_state.username + " \n Response: 200 \nPulled Stock data successfully")
                     st.success("Successfully pulled Stock Data")
-                    merged_data = response.text
+                    merged_data = json.loads(response.text)
+                    # Convert the list of dictionaries to a pandas DataFrame
+                    df2 = pd.DataFrame.from_records(merged_data)
+
+                    # Set the 'symbol' column as the index
+                    df2.set_index('symbol', inplace=True)
+
+                    # Display the DataFrame in Streamlit
+                    st.write(df2)    
+                                    
                 elif response.status_code == 401:
                     st.error("Session token expired, please login again")
                     write_api_logs("API endpoint: /stock-data-scrape\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")
@@ -133,13 +175,17 @@ if st.session_state.logged_in == True:
                 else:
                     st.error("Something went wrong, please try again later")
 
+            
             except:
                 st.error("Service is unavailable at the moment !!")
                 st.error("Please try again later")
                 st.stop()
             
-        st.write(merged_data)
 
+                
+                
+
+            
     recommend_stock = st.button('Recommend Stocks!!!')
     if recommend_stock:
         with st.spinner("Wait.."):
@@ -150,20 +196,38 @@ if st.session_state.logged_in == True:
                 if response.status_code == 200:
                     write_api_logs("API endpoint: /stock-recommendation\n Called by: " + st.session_state.username + " \n Response: 200 \nRecommended Top 5 stocks successfully")
                     st.success("Recommended stocks")
-                    recommended_stock = json.loads(response.text)
+
+
                 elif response.status_code == 401:
                     st.error("Session token expired, please login again")
                     write_api_logs("API endpoint: /stock-recommendation\n Called by: " + st.session_state.username + " \n Response: 401 \nSession token expired")
                     st.stop()
                 else:
                     st.error("Something went wrong, please try again later")
+                   
 
             except:
                 st.error("Service is unavailable at the moment !!")
                 st.error("Please try again later")
                 st.stop()
 
-        st.write(recommend_stock)
+            recommended_stock = json.loads(response.text)
+
+            # Convert the list of dictionaries to a pandas DataFrame
+            df = pd.DataFrame.from_records(recommended_stock)
+
+
+            # Display the DataFrame in Streamlit
+            st.write(df)
+            # assume df is your DataFrame
+            fig = px.histogram(df, x='symbol', y='predicted_next_week_return')
+            st.plotly_chart(fig)
+            # Assuming df is the pandas DataFrame containing the data
+            st.subheader("Recommended stocks Graph!")
+            symbols_list = df["symbol"].tolist()
+            stock_code_plot(symbols_list)     
+
+            
 
     generate_newsletter = st.button('Generate Custom Newsletter!!!')
     if generate_newsletter:
