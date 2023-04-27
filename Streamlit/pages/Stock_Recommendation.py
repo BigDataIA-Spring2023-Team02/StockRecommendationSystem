@@ -219,8 +219,17 @@ if st.session_state.logged_in == True:
 
             # Display the DataFrame in Streamlit
             st.write(df)
-            # assume df is your DataFrame
-            fig = px.histogram(df, x='symbol', y='predicted_next_week_return')
+            # Create a new column 'color' that maps positive and negative values to green and red, respectively
+            df['color'] = df['predicted_next_week_return'].apply(lambda x: 'green' if x >= 0 else 'red')
+
+            # Define a dictionary that maps color values to their corresponding color codes
+            color_map = {'green': 'rgb(50,205,50)', 'red': 'rgb(255,0,0)'}
+
+            # Create a histogram and color the bars based on the 'color' column using the color_map dictionary
+            fig = px.histogram(df, x='symbol', y='predicted_next_week_return', color='color', 
+                            color_discrete_map=color_map)
+
+            # Display the histogram in Streamlit
             st.plotly_chart(fig)
             # Assuming df is the pandas DataFrame containing the data
             st.subheader("Recommended stocks Graph!")
