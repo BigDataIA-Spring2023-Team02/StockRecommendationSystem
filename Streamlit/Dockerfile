@@ -11,7 +11,6 @@ COPY . /Streamlit
 # Copy main.py as source cod and req.txt as dependency
 
 # Install the dependency
-RUN pip install ta
 RUN pip install -r requirements.txt
 
 ### Container Env same as local at this point
