@@ -169,7 +169,7 @@ def stock_code_tables(Stock_code):
 
 
 if st.session_state.logged_in == True:
-    st.title("Stock Recommendation Tool !!!")
+    st.title("Market Mavericks: Your Captivating Digest!!!")
 
     with st.sidebar:
         if st.session_state and st.session_state.logged_in and st.session_state.username:

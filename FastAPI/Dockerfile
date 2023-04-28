@@ -7,6 +7,7 @@ WORKDIR /FastAPI
 COPY . /FastAPI
 
 RUN pip install -r requirements.txt
+RUN pip install bcrypt
 
 EXPOSE 8000
 

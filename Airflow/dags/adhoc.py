@@ -5,8 +5,8 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
 
-BASE_URL = os.getenv("API_URL", "http://host.docker.internal:8000")
-# BASE_URL = "http://host.docker.internal:8000"
+# BASE_URL = os.getenv("API_URL", "http://localhost:8000/")
+BASE_URL = "http://44.215.201.22:8000"
 # BASE_URL = "http://localhost:8050"
  # Replace with your FastAPI app URL
 
@@ -58,7 +58,7 @@ def get_auth_token(username, password):
 
 
 def call_get_auth_token():
-    token = get_auth_token("admin", "admin1234")
+    token = get_auth_token("admin", "admin123")
     if token is None:
         raise Exception("Failed to get auth token.")
     return token

@@ -7,13 +7,14 @@ RUN pip install --upgrade pip
 WORKDIR /Streamlit
 
 COPY . /Streamlit
-# COPY Login_Page.py pages/Forgot_Password.py pages/Register_Page.py /pages/Stock_Dashboard.py pages/Stock_Recommendation.py pages/Upgrade_Plan.py requirements.txt /Streamlit
-# Copy main.py as source cod and req.txt as dependency
 
-# Install the dependency
+# Install the dependencies
 RUN pip install -r requirements.txt
 
-### Container Env same as local at this point
+# Copy the .env file to the container
+COPY .env ./
+
+# Expose the port for the container
 EXPOSE 8050
 
 CMD ["streamlit", "run", "Login_Page.py", "--server.port", "8050"]

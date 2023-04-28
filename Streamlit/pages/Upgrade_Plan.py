@@ -67,7 +67,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.password = ''
 
 if st.session_state.logged_in == True:
-    st.title("Stock Recommendation Tool !!!")
+    st.title("Market Mavericks: Your Captivating Digest!!!")
     st.header('Upgrade Your Plan !!!')
 
     with st.sidebar:

@@ -74,7 +74,7 @@ with st.sidebar:
         st.write('Current User: Not Logged In')
 
 if st.session_state.logged_in == False:
-    st.title("Stock Recommendation Tool !!!")
+    st.title("Market Mavericks: Your Captivating Digest!!!")
     st.header("Login Page !!!")
 
     username = st.text_input("Username")
