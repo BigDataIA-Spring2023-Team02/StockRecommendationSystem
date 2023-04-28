@@ -1,10 +1,9 @@
 # Stock Recommendation System
-<!-- > ✅ Active status <br> -->
-> [🚀 Streamlit][def] <br>
-> [🧑🏻‍💻 FastAPI][def] <br>
-> [⏱ Airflow][def] <br>
-> [🎬 Codelab Slides][def] <br>
-> 🐳 Docker Hub Images: [FastAPI](https://hub.docker.com/repository/docker/doshimee11), [Streamlit](https://hub.docker.com/repository/docker/doshimee11) <br>
+> ✅ Active status <br>
+> [🚀 Streamlit][http://44.215.201.22:8501] <br>
+> [🧑🏻‍💻 FastAPI][http://44.215.201.22:8000/docs] <br>
+> [⏱ Airflow][http://44.215.201.22:8080/home] <br>
+> [🎬 Codelab Slides][https://codelabs-preview.appspot.com/?file_id=1h3lM1FPgsy0AcRAXEcB00uf5y7V1ZQUb_Cad46vHcuw#0] <br>
 
 ----- 
 
@@ -29,24 +28,29 @@ This repository contains a collection of Big Data Systems & Intelligence Analyti
   - [Project Components 💽](#project-components)
   - [Streamlit](#streamlit) 
   - [FastAPI](#fast-api)
-  - [Unit Testing ⚒️](#unit-testing)
   - [Process Flow](#process-flow)
 
 
 ## Objective
+To create a custom stock recommendation newsletter dashboard that will provide top recommended stocks to investors and generate a personalized newsletter based on the user's preferences and the top recommended stocks.
 
 
 ## Abstract
+This project aims to develop a custom stock recommendation newsletter dashboard that will provide investors with top recommended stocks and create personalized newsletters based on their preferences and investment goals. The dashboard will use advanced algorithms to analyze the stock market data and identify the best stocks based on various factors, such as market trends, company performance, and financial indicators.
+
+Users will be able to set their preferences and receive personalized newsletters with the latest insights and trends in the stock market. The dashboard will also allow users to track their favorite stocks, receive alerts on price changes, and access historical data.
+
+The objective of this project is to provide investors with a user-friendly and intuitive dashboard that will provide them with accurate and reliable information to make informed investment decisions. The custom stock recommendation newsletter dashboard will be a valuable tool for investors looking to stay informed about the latest stock market trends and make smart investment decisions.
 
 
 ## Architecture Diagram
 This architecture diagram depicts the flow of the application and the relationships between services. NOTE: Our proposed diagram is same our final implemented framework
 
-![Architecure Diagram](---)
+<!-- ![Architecure Diagram](---) -->
 
 
 ## Installation
-Clone this repository: git clone https://github.com/BigDataIA-Spring2023-Team02/StealTheDeal.git
+Clone this repository: git clone https://github.com/BigDataIA-Spring2023-Team02/StockRecommendationSystem.git
 
 ### Project Tree:
 ```bash
@@ -54,8 +58,7 @@ Clone this repository: git clone https://github.com/BigDataIA-Spring2023-Team02/
 └── StockRecommendationSystem
     ├── Airflow
     │   ├── dags
-    │       ├── adhoc_dag.py
-    │       └── batch_dag.py
+    │       └── adhoc.py
     │   ├── logs
     │   ├── plugins
     │   ├── working_dir
@@ -64,19 +67,33 @@ Clone this repository: git clone https://github.com/BigDataIA-Spring2023-Team02/
     ├── FastAPI
     │   ├── .env
     │   ├── Dockerfile
+    │   ├── download.py
+    │   ├── filtered_data.csv
     │   ├── jwt_api.py
     │   ├── mainapiapp.py
+    │   ├── merged_data.csv
+    │   ├── model.joblib
+    │   ├── model.py
+    │   ├── requirements.txt
     │   ├── schemas.py
     │   ├── user_data.db
     │   └── user_data.py
     ├── Streamlit
     │   ├── pages
     │       ├── Forgot_Password.py
-    │       └── Register_Page.py
+    │       ├── Register_Page.py
+    │       ├── Stock_Dashboard.py
+    │       ├── Stock_Recommendation.py
+    │       └── Upgrade_Plan.py
     │   ├── .env
     │   ├── Dockerfile
-    │   └── Login_Page.py
+    │   ├── Login_Page.py
+    │   └── requirements.txt
+    ├── .env
+    ├── .gitattributes
     ├── .gitignore
+    ├── docker-compose.yaml
+    ├── edit_stock_recommendation_merged_suite.ipynb
     ├── README.md
     ├── requirements.txt
     └── StockPriceEDA.ipynb
@@ -90,8 +107,7 @@ Clone this repository: git clone https://github.com/BigDataIA-Spring2023-Team02/
 ## Project Components
 - FastAPI: REST API endpoints for the application
 - Streamlit: Frontend interface for the Stock Recommendation System application
-- Airflow: DAG to ----. Second DAG to perform data quality check of the metadata scraped using Great Expectations.
-- Docker images: Both FastAPI and Streamlit images have been put on Docker Hub. These images have been pulled using the [](---) and the application is deployed through AWS live on URL specified above
+- Airflow: DAG to responsible for scraping data from the sources and storing it in a database for further processing. DAG to generates stock recommendations based on the scraped data, analyzing trends and patterns to provide insights to users. DAG to create a newsletter summary by consolidating information from various sources and generating a concise, engaging summary for users.
 
 
 ## Streamlit
@@ -141,12 +157,6 @@ docker push doshimee11/stock_api_v1:latest
 ```
 
 
-## Unit Testing
-[PyTest](https://docs.pytest.org/en/7.1.x/contents.html) framework implemented to write tests which is easy to use but can be scaled to support functional testing for applications and libraries.
-* Create a new file [___][def], containing test functions
-* Implemented testing functions for all API endpoints. The tests have also been integrated to git actions and run on every commit. The workflow is present at [___][def]
-
-
 ## Process Flow
 * Download app files
 
@@ -178,7 +188,6 @@ AWS_SECRET_KEY=XXXXX
 USER_BUCKET_NAME=XXXXX
 AWS_LOGS_ACCESS_KEY=XXXXX
 AWS_LOGS_SECRET_KEY=XXXXX
-APP_STATUS=DEV
 ```
 
 * To run on docker:
@@ -194,7 +203,6 @@ docker compose up
 ```
 
 * To run locally:
-> Change the env variable of APP_STATUS from "PROD" to "DEV"
 > Run Streamlit app
 ```bash
 cd Streamlit/
@@ -204,7 +212,7 @@ streamlit run Login_Page.py
 > Run FastAPI
 ```bash
 cd FastAPI/
-uvicorn mainapiapp:app --reload --port 8001
+uvicorn mainapiapp:app --reload --port 8000
 ```
 
 This runs the application with a frontend streamlit interface on [___][def]
