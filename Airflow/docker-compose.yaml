@@ -25,7 +25,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/working_data:/opt/airflow/working_data
-  user: "${AIRFLOW_UID:-50000}:0"
+  user: "${AIRFLOW_UID:-501}:0"
   depends_on:
     &airflow-common-depends-on
     redis:
@@ -48,12 +48,6 @@ services:
       retries: 5
     restart: always
 
-  fastapi_app:
-    container_name: my_fastapi
-    image: stocks:v2
-    ports:
-      - "8050:8050"
-
   redis:
     image: redis:latest
     expose:
@@ -67,9 +61,9 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: webserver
+    command: bash -c "airflow db init && airflow webserver"
     ports:
-      - 8888:8080
+      - 8080:8080
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 10s
@@ -83,9 +77,13 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
-    command: scheduler
+    command: bash -c "airflow db init && airflow scheduler"
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"',
+        ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -97,7 +95,7 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    command: celery worker
+    command: bash -c "airflow db init && airflow celery worker"
     healthcheck:
       test:
         - "CMD-SHELL"

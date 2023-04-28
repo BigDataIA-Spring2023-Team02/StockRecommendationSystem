@@ -107,7 +107,7 @@ services:
 
     airflow-webserver:
         <<: *airflow-common
-        command: webserver
+        command: bash -c "airflow db init && airflow webserver"
         ports:
             - 8080:8080
         healthcheck:
@@ -123,7 +123,7 @@ services:
 
     airflow-scheduler:
         <<: *airflow-common
-        command: scheduler
+        command: bash -c "airflow db init && airflow scheduler"
         healthcheck:
             test:
                 [
@@ -141,7 +141,7 @@ services:
 
     airflow-worker:
         <<: *airflow-common
-        command: celery worker
+        command: bash -c "airflow db init && airflow celery worker"
         healthcheck:
             test:
                 - "CMD-SHELL"
