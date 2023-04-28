@@ -1,7 +1,6 @@
 import os
-import ta
-import json
 import time
+import json
 import boto3
 import requests
 import yfinance as yf
@@ -89,7 +88,7 @@ def stock_code_plot(ticker_data):
     ticker_df = ticker_data.history(period = time_period)
 
     # Add a 50-day moving average to the price chart
-    ticker_df['MA50'] = ta.trend.sma_indicator(ticker_df['Close'], window=50)
+    ticker_df['MA50'] = ticker_df['Close'].rolling(window=50).mean()
 
     fig1 = go.Figure(data = [go.Candlestick(x = ticker_df.index,
                                         open = ticker_df['Open'],
@@ -221,7 +220,7 @@ if st.session_state.logged_in == True:
     response = requests.get('https://finance.yahoo.com/most-active/', headers = header)
     soup = BeautifulSoup(response.content, 'lxml')
     write_logs(f"Calling Yahoo Finance API")
-    
+
     # Create a list to hold the options for the radio button
     options = []
     for item in soup.select('.simpTblRow')[:5]:

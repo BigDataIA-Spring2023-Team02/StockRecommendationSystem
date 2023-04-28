@@ -1,16 +1,15 @@
 import os
-import pandas as pd
 import json
 import time
 import boto3
 import requests
+import pandas as pd
+import yfinance as yf
 import streamlit as st
+import plotly.express as px
+import plotly.graph_objs as go
 from dotenv import load_dotenv
 from streamlit_extras.switch_page_button import switch_page
-import yfinance as yf
-import ta
-import plotly.graph_objs as go
-import plotly.express as px
 
 load_dotenv()
 BASE_URL = os.getenv("API_URL", "http://localhost:8000")

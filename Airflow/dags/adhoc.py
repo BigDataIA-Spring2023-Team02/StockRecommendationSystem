@@ -1,10 +1,12 @@
+import os
 import requests
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
 
-BASE_URL = "http://host.docker.internal:8000"
+BASE_URL = os.getenv("API_URL", "http://host.docker.internal:8000")
+# BASE_URL = "http://host.docker.internal:8000"
 # BASE_URL = "http://localhost:8050"
  # Replace with your FastAPI app URL
 
