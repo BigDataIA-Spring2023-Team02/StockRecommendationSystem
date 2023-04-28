@@ -1,9 +1,9 @@
 # Stock Recommendation System
 > ✅ Active status <br>
-> [🚀 Streamlit][http://44.215.201.22:8501] <br>
-> [🧑🏻‍💻 FastAPI][http://44.215.201.22:8000/docs] <br>
-> [⏱ Airflow][http://44.215.201.22:8080/home] <br>
-> [🎬 Codelab Slides][https://codelabs-preview.appspot.com/?file_id=1h3lM1FPgsy0AcRAXEcB00uf5y7V1ZQUb_Cad46vHcuw#0] <br>
+> [🚀 Streamlit](http://44.215.201.22:8501) <br>
+> [🧑🏻‍💻 FastAPI](http://44.215.201.22:8000/docs) <br>
+> [⏱ Airflow](http://44.215.201.22:8080/home) <br>
+> [🎬 Codelab Slides](https://codelabs-preview.appspot.com/?file_id=1h3lM1FPgsy0AcRAXEcB00uf5y7V1ZQUb_Cad46vHcuw#0) <br>
 
 ----- 
 
