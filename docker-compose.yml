@@ -123,7 +123,7 @@ services:
 
     airflow-scheduler:
         <<: *airflow-common
-        command: bash -c "airflow db init && airflow scheduler"
+        command: scheduler
         healthcheck:
             test:
                 [
@@ -141,7 +141,7 @@ services:
 
     airflow-worker:
         <<: *airflow-common
-        command: bash -c "airflow db init && airflow celery worker"
+        command: celery worker
         healthcheck:
             test:
                 - "CMD-SHELL"
@@ -252,9 +252,14 @@ services:
             _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
             _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
             _PIP_ADDITIONAL_REQUIREMENTS: ""
+            AIRFLOW_CORE_SQL_ALCHEMY_CONN: ""
+            AIRFLOW_CORE_EXECUTOR: ""
         user: "0:0"
         volumes:
             - ${AIRFLOW_PROJ_DIR:-.}:/sources
+            - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+            - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+            - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
 
     airflow-cli:
         <<: *airflow-common
