@@ -8,12 +8,7 @@ from dotenv import load_dotenv
 from streamlit_extras.switch_page_button import switch_page
 
 load_dotenv()
-app_status = os.environ.get('APP_STATUS')
-
-if app_status == "DEV":
-    BASE_URL = "http://localhost:8000"
-elif app_status == "PROD":
-    BASE_URL = "http://:8000"
+BASE_URL = os.getenv("API_URL", "http://localhost:8000")
 
 clientLogs = boto3.client('logs',
                         region_name='us-east-1',
